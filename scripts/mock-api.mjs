@@ -1,6 +1,6 @@
 /**
- * Optional local stand-in for angoshtarbaz-backend when PR #2 is not running.
- * Implements the admin login + create-product contract used by this panel.
+ * Optional local stand-in for angoshtarbaz-backend when PR #2 / #3 is not running.
+ * Implements login, create product, public GET /products/:id, and admin PATCH.
  *
  *   node scripts/mock-api.mjs
  *   # listens on http://localhost:3001
@@ -22,13 +22,37 @@ const collections = [
   { id: "white-gold", name: "طلای سفید" },
 ];
 
+const SEED_SOLITAIRE = {
+  id: "prd_solitaire_01",
+  name: "انگشتر سولیتر الماس",
+  slug: "solitaire-diamond-ring",
+  description:
+    "سولیتر کلاسیک با نگین برلیان گرد ۰.۸ قیراط، نشسته در بزل چهارچنگ دست‌ساز. رکاب طلای ۱۸ عیار با پرداخت براق — طراحی مینیمال برای درخشش حداکثری نگین.",
+  price: 1_280_000_000,
+  collectionId: "solitaire",
+  status: "published",
+  sizes: [50, 52, 54, 56, 58],
+  specs: {
+    weight: "۳٫۲ گرم",
+    karat: "طلای ۱۸ عیار (۷۵۰)",
+    gem: "برلیان طبیعی ۰.۸ قیراط · رنگ G · شفافیت VS1",
+    cut: "برلیان گرد (Round Brilliant) · ۵۷ وجه",
+    band: "طلای زرد ۱۸ عیار · بزل چهارچنگ دست‌ساز",
+  },
+  imageIds: [],
+  urls: [],
+  stock: 6,
+};
+
+products.set(SEED_SOLITAIRE.id, { ...SEED_SOLITAIRE, specs: { ...SEED_SOLITAIRE.specs } });
+
 function send(res, status, body, origin) {
   const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
   };
   res.writeHead(status, headers);
   res.end(body === undefined ? "" : JSON.stringify(body));
@@ -57,6 +81,24 @@ function requireAdmin(req, res, origin) {
     return null;
   }
   return session;
+}
+
+function mergeProduct(existing, payload) {
+  const next = { ...existing, specs: { ...(existing.specs ?? {}) } };
+  if (payload.name != null) next.name = payload.name;
+  if (payload.slug != null) next.slug = payload.slug;
+  if (payload.description != null) next.description = payload.description;
+  if (typeof payload.price === "number") next.price = payload.price;
+  if (payload.collectionId != null) next.collectionId = payload.collectionId;
+  if (payload.status === "published" || payload.status === "draft") next.status = payload.status;
+  if (Array.isArray(payload.sizes)) next.sizes = payload.sizes;
+  if (payload.specs && typeof payload.specs === "object") {
+    next.specs = { ...next.specs, ...payload.specs };
+  }
+  if (Array.isArray(payload.imageIds)) next.imageIds = payload.imageIds;
+  if (Array.isArray(payload.urls)) next.urls = payload.urls;
+  if (typeof payload.stock === "number") next.stock = payload.stock;
+  return next;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -139,15 +181,36 @@ const server = http.createServer(async (req, res) => {
     }
 
     const productMatch = url.pathname.match(/^\/products\/([^/]+)$/);
-    if (req.method === "GET" && productMatch) {
-      if (!requireAdmin(req, res, origin)) return;
-      const product = products.get(productMatch[1]);
-      if (!product) {
-        send(res, 404, { message: "Product not found" }, origin);
+    if (productMatch) {
+      const id = decodeURIComponent(productMatch[1]);
+      const product = products.get(id);
+
+      if (req.method === "GET") {
+        // Backend PR #3: GET /products/:id is public and includes drafts.
+        if (!product) {
+          send(res, 404, { message: "Product not found" }, origin);
+          return;
+        }
+        send(res, 200, product, origin);
         return;
       }
-      send(res, 200, product, origin);
-      return;
+
+      if (req.method === "PATCH") {
+        if (!requireAdmin(req, res, origin)) return;
+        if (!product) {
+          send(res, 404, { message: "Product not found" }, origin);
+          return;
+        }
+        const payload = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+        if (payload.price != null && typeof payload.price !== "number") {
+          send(res, 400, { message: "price must be a number (IRR)." }, origin);
+          return;
+        }
+        const next = mergeProduct(product, payload);
+        products.set(id, next);
+        send(res, 200, next, origin);
+        return;
+      }
     }
 
     send(res, 404, { message: `No mock route for ${req.method} ${url.pathname}` }, origin);
@@ -159,4 +222,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`angoshtarbaz mock API listening on http://localhost:${PORT}`);
   console.log(`seed: ${SEED_EMAIL} / ${SEED_PASSWORD}`);
+  console.log(`sample product GET /products/${SEED_SOLITAIRE.id}`);
 });

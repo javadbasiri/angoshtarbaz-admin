@@ -1,5 +1,4 @@
-import { AdminShell } from "@/components/admin/shell";
-import { ProductEditPlaceholder } from "@/components/product/product-edit-placeholder";
+import { ProductEditor } from "@/components/product/product-editor";
 
 function productIdFromParam(id: string) {
   try {
@@ -15,11 +14,5 @@ export default async function EditProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
-  return (
-    <AdminShell title="ویرایش محصول" eyebrow="محصولات · اسکلت ANG-A2">
-      <ProductEditPlaceholder productId={productIdFromParam(id)} />
-    </AdminShell>
-  );
+  return <ProductEditor productId={productIdFromParam(id)} />;
 }
-

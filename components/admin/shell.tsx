@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminHeader } from "@/components/admin/header";
+import { AdminHeader, type AdminBreadcrumbItem } from "@/components/admin/header";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { AdminShellProvider, useAdminShell } from "@/components/admin/shell-context";
 
@@ -20,10 +20,12 @@ export function AdminShell({
   children,
   title,
   eyebrow,
+  breadcrumb,
 }: {
   children: React.ReactNode;
   title: string;
   eyebrow?: string;
+  breadcrumb?: AdminBreadcrumbItem[];
 }) {
   return (
     <AdminShellProvider>
@@ -31,7 +33,7 @@ export function AdminShell({
         <Backdrop />
         <AdminSidebar />
         <div className="admin-main">
-          <AdminHeader title={title} eyebrow={eyebrow} />
+          <AdminHeader title={title} eyebrow={eyebrow} breadcrumb={breadcrumb} />
           <main className="admin-content">{children}</main>
         </div>
       </div>

@@ -22,8 +22,8 @@ export default function DashboardPage() {
             <Link className="btn btn--primary" href="/products/new">
               رفتن به افزودن محصول →
             </Link>
-            <Link className="btn btn--secondary" href="/products/demo/edit">
-              اسکلت ویرایش محصول →
+            <Link className="btn btn--secondary" href="/products/prd_solitaire_01/edit">
+              ویرایش محصول نمونه →
             </Link>
           </div>
         </div>

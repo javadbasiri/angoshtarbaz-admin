@@ -63,7 +63,7 @@ export function AdminSidebar() {
           </span>
         ))}
       </nav>
-      <div className="sidebar__footer">نسخه · ANG-A1</div>
+      <div className="sidebar__footer">نسخه · ANG-A2</div>
     </aside>
   );
 }

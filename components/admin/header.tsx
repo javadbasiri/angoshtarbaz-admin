@@ -1,19 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MenuIcon } from "@/components/admin/icons";
 import { useAdminShell } from "@/components/admin/shell-context";
 
+export type AdminBreadcrumbItem = {
+  href?: string;
+  label: string;
+};
+
 type AdminHeaderProps = {
   title: string;
   eyebrow?: string;
+  breadcrumb?: AdminBreadcrumbItem[];
   userName?: string;
 };
 
 export function AdminHeader({
   title,
   eyebrow,
+  breadcrumb,
   userName = "ادمین فروشگاه",
 }: AdminHeaderProps) {
   const { sidebarOpen, toggleSidebar, setSidebarOpen } = useAdminShell();
@@ -52,7 +60,29 @@ export function AdminHeader({
           <MenuIcon />
         </button>
         <div className="admin-header__titles">
-          {eyebrow ? <p className="admin-header__eyebrow">{eyebrow}</p> : null}
+          {breadcrumb && breadcrumb.length > 0 ? (
+            <nav className="breadcrumb" aria-label="مسیر">
+              {breadcrumb.map((item, index) => {
+                const isLast = index === breadcrumb.length - 1;
+                return (
+                  <span key={`${item.label}-${index}`} style={{ display: "contents" }}>
+                    {index > 0 ? (
+                      <span className="breadcrumb__sep" aria-hidden="true">
+                        /
+                      </span>
+                    ) : null}
+                    {item.href && !isLast ? (
+                      <Link href={item.href}>{item.label}</Link>
+                    ) : (
+                      <span className={isLast ? "breadcrumb__current" : undefined}>{item.label}</span>
+                    )}
+                  </span>
+                );
+              })}
+            </nav>
+          ) : eyebrow ? (
+            <p className="admin-header__eyebrow">{eyebrow}</p>
+          ) : null}
           <h1 className="admin-header__title">{title}</h1>
         </div>
       </div>
