@@ -1,0 +1,28 @@
+import Link from "next/link";
+import { AdminShell } from "@/components/admin/shell";
+
+export default function DashboardPage() {
+  return (
+    <AdminShell title="داشبورد" eyebrow="ANG-A0 · مرجع چیدمان">
+      <div className="panel" style={{ maxWidth: 720 }}>
+        <div className="panel__head">
+          <h2 className="panel__title">پوسته ادمین (ANG-A0)</h2>
+          <span className="panel__hint">سایدبار · هدر · ناحیه محتوا</span>
+        </div>
+        <div className="panel__body">
+          <p style={{ marginBottom: 12, color: "var(--color-muted)" }}>
+            این صفحه چیدمان پوسته را نشان می‌دهد. ناوبری: محصولات (فعال) · سفارشات و تنظیمات
+            (به‌زودی).
+          </p>
+          <p style={{ marginBottom: 16 }}>
+            در عرض کمتر از ۹۶۰px، سایدبار به‌صورت کشو باز می‌شود — دکمه همبرگر را در هدر امتحان
+            کنید.
+          </p>
+          <Link className="btn btn--primary" href="/products/new">
+            رفتن به افزودن محصول →
+          </Link>
+        </div>
+      </div>
+    </AdminShell>
+  );
+}
