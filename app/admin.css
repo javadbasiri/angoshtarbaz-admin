@@ -753,6 +753,14 @@ html[dir="ltr"] .sidebar.is-open,
   box-shadow: var(--focus-ring);
 }
 
+.input:disabled,
+.textarea:disabled,
+.select:disabled {
+  background: var(--color-bg-muted);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
 .textarea {
   min-height: 120px;
   resize: vertical;
@@ -834,6 +842,16 @@ html[dir="rtl"] .input-affix__suffix {
 
 .size-chip:focus-visible {
   box-shadow: var(--focus-ring);
+}
+
+.size-chip:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.size-chip:disabled:hover {
+  border-color: var(--color-border);
+  color: inherit;
 }
 
 .specs-grid {
