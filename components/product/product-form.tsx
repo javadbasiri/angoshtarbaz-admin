@@ -95,11 +95,25 @@ export function ProductForm({ prefillSample = false }: { prefillSample?: boolean
   }, [toast]);
 
   const selectedSizes = useMemo(() => new Set(values.sizes), [values.sizes]);
-  const previewMeta = buildPreviewMeta(values.specs);
+  const previewMeta = buildPreviewMeta(values.specs, {
+    description: values.description,
+  });
   const previewPrice = parseTomanInput(values.priceToman);
   const previewImage = values.gallery[0]?.url;
 
+  function clearError(key: keyof FieldErrors) {
+    setErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
   function patch(next: Partial<ProductFormValues>) {
+    if (next.name !== undefined) clearError("name");
+    if (next.priceToman !== undefined) clearError("priceToman");
+    if (next.collectionId !== undefined) clearError("collectionId");
     setValues((current) => ({ ...current, ...next }));
   }
 
@@ -163,7 +177,7 @@ export function ProductForm({ prefillSample = false }: { prefillSample?: boolean
     const next: FieldErrors = {};
     if (!values.name.trim()) next.name = "نام محصول الزامی است.";
     const toman = parseTomanInput(values.priceToman);
-    if (toman === null) next.priceToman = "قیمت باید عدد معتبر به تومان باشد.";
+    if (toman === null || toman === 0) next.priceToman = "قیمت باید عدد معتبر به تومان باشد.";
     if (!values.collectionId) next.collectionId = "انتخاب کالکشن الزامی است.";
     return next;
   }
@@ -427,9 +441,7 @@ export function ProductForm({ prefillSample = false }: { prefillSample?: boolean
                   <p className="field__error" id="price-err">
                     {errors.priceToman}
                   </p>
-                  <p className="field__hint">
-                    قیمت در رابط به تومان است؛ هنگام ارسال به API به ریال (IRR، ×۱۰) تبدیل می‌شود.
-                  </p>
+                  <p className="field__hint">در API به ریال ارسال می‌شود (تومان × ۱۰).</p>
                 </div>
                 <div className={`field${errors.collectionId ? " is-invalid" : ""}`}>
                   <label className="field__label" htmlFor="collection">

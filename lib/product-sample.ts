@@ -45,16 +45,24 @@ export function sampleProductFormValues(
   };
 }
 
-export function buildPreviewMeta(specs: ProductFormValues["specs"]): string {
+/** ۰.۸ / 0.8 only — does not match 0.75 / ۰.۷۵. */
+const POINT_EIGHT = /۰\.۸|۰٫۸|0\.8|٠\.٨/;
+
+export function buildPreviewMeta(
+  specs: ProductFormValues["specs"],
+  extras: { description?: string } = {},
+): string {
   const gem = specs.gem.trim();
   const band = specs.band.trim();
   const karat = specs.karat.trim();
+  const blob = `${gem} ${extras.description ?? ""}`;
 
-  const gemBit =
-    gem.includes("۰.۸") || gem.includes("0.8")
-      ? "برلیان ۰.۸ قیراط"
-      : gem.split("·")[0]?.trim() || "";
+  if (POINT_EIGHT.test(blob)) {
+    const has18k = /۱۸|18/.test(`${karat} ${band} ${extras.description ?? ""}`);
+    return has18k ? SAMPLE_PRODUCT.previewMeta : "برلیان ۰.۸ قیراط";
+  }
 
+  const gemBit = gem.split("·")[0]?.trim() || "";
   const bandBit = band
     ? band.startsWith("رکاب")
       ? band.split("·")[0]?.trim()
@@ -66,6 +74,5 @@ export function buildPreviewMeta(specs: ProductFormValues["specs"]): string {
   if (gemBit && bandBit) return `${gemBit} · ${bandBit}`;
   if (gemBit) return gemBit;
   if (bandBit) return bandBit;
-  if (gem) return gem;
   return "";
 }
