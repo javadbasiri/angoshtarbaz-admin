@@ -39,7 +39,15 @@ export async function backendFetch(
 ): Promise<{ response: Response; body: unknown }> {
   const headers = new Headers(init.headers);
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
-  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+  const binaryBody =
+    typeof FormData !== "undefined" && init.body instanceof FormData
+      ? true
+      : typeof Blob !== "undefined" && init.body instanceof Blob
+        ? true
+        : typeof ArrayBuffer !== "undefined" && init.body instanceof ArrayBuffer
+          ? true
+          : typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(init.body);
+  if (init.body && !binaryBody && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   if (token) headers.set("Authorization", `Bearer ${token}`);

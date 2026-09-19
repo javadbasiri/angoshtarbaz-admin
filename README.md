@@ -1,12 +1,13 @@
 # انگشترباز — Admin
 
-پنل ادمین فروشگاه انگشترباز (مستقل از فروشگاه). RTL فارسی، Vazirmatn، و توکن‌های برند mockupهای ANG-A0 / ANG-A1 / ANG-A2.
+پنل ادمین فروشگاه انگشترباز (مستقل از فروشگاه). RTL فارسی، Vazirmatn، و توکن‌های برند mockupهای ANG-A0 / ANG-A1 / ANG-A2 / ANG-A3.
 
 ## Scope
 
 - **ANG-A0** — پوسته ادمین: سایدبار + هدر چسبان + محتوا، برند «انگشترباز» + بج ادمین، ناوبری محصولات (فعال) و سفارشات/تنظیمات به‌زودی. در عرض کمتر از ۹۶۰px کشوی همبرگر +backdrop.
 - **ANG-A1** — افزودن محصول: فرم کامل، پیش‌نمایش کارت زنده، اعتبارسنجی، اسکلتون، بنر/توست موفقیت، اتصال به API.
 - **ANG-A2** — ویرایش محصول: `GET /products/:id` برای پر کردن فرم، `PATCH` برای ذخیره، اسکلتون / یافت‌نشد / خطا با تلاش مجدد / ذخیره / اعتبارسنجی / بنر موفقیت. قیمت UI تومان است و API ریال (÷۱۰ نمایش، ×۱۰ ذخیره).
+- **ANG-A3** — گالری مرکزی رسانه: صفحه `/gallery`، آپلود presign→PUT→ثبت، چندانتخاب/حذف، و مودال «انتخاب از گالری» روی افزودن/ویرایش محصول (`imageIds[]`).
 - احراز هویت JWT ادمین با کوکی **httpOnly**.
 - خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، فهرست محصولات، دیپلوی.
 
@@ -26,11 +27,11 @@ npm run dev
 
 ادمین: [http://localhost:3000](http://localhost:3000)
 
-بک‌اند باید روی پورت پیش‌فرض `3001` باشد (`NEXT_PUBLIC_API_URL`). اگر [angoshtarbaz-backend](https://github.com/javadbasiri/angoshtarbaz-backend) (ایجاد محصول + ویرایش) در دسترس نیست، API ساختگی محلی را اجرا کنید:
+بک‌اند باید روی پورت پیش‌فرض `3001` باشد (`NEXT_PUBLIC_API_URL`). اگر [angoshtarbaz-backend](https://github.com/javadbasiri/angoshtarbaz-backend) (ایجاد/ویرایش محصول + گالری PR #4) در دسترس نیست، API ساختگی محلی را اجرا کنید:
 
 ```bash
 npm run mock-api
-# http://localhost:3001  — login / collections / products (GET عمومی، PATCH ادمین)
+# http://localhost:3001  — login / collections / products / gallery
 # نمونه: GET /products/prd_solitaire_01
 ```
 
@@ -64,8 +65,10 @@ ADMIN_ORIGIN=http://localhost:3000
 | `/` و `/dashboard` | داشبورد / placeholder داخل پوسته |
 | `/products/new` | افزودن محصول (ANG-A1) |
 | `/products/[id]/edit` | ویرایش محصول (ANG-A2) |
+| `/gallery` | گالری مرکزی رسانه (ANG-A3) |
 | `/admin` و `/admin/products/new` | redirect به مسیرهای بالا (سازگاری اسکلت) |
 | `/admin/products/[id]/edit` | redirect به `/products/[id]/edit` |
+| `/admin/gallery` و `/admin/media` | redirect به `/gallery` |
 
 ## API mapping
 
@@ -80,7 +83,13 @@ ADMIN_ORIGIN=http://localhost:3000
 | ایجاد محصول | `POST /api/products` | `POST /products` سپس `GET /products/:id` |
 | خواندن محصول | `GET /api/products/:id` | `GET /products/:id` — عمومی روی بک‌اند (شامل پیش‌نویس)؛ BFF همچنان نشست ادمین می‌خواهد |
 | ویرایش محصول | `PATCH /api/products/:id` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری؛ همان شکل ایجاد |
-| گالری | `POST /api/uploads` | `POST /uploads` (یا `/media`, `/images`) — اختیاری |
+| فهرست گالری | `GET /api/gallery` | `GET /gallery` — `{ data, meta }` |
+| Presign آپلود | `POST /api/gallery/presign` | `POST /gallery/presign` → `{ uploadUrl, headers, key, publicUrl, provider }` |
+| آپلود بایت | `PUT /api/gallery/upload/:key` | `PUT /gallery/upload/:key` (mock) یا URL امضاشده S3 |
+| ثبت فایل | `POST /api/gallery` | `POST /gallery` — بعد از آپلود؛ `id` برای `imageIds[]` |
+| حذف فایل | `DELETE /api/gallery/:id` | `DELETE /gallery/:id` |
+| فایل عمومی (mock) | — | `GET /gallery/files/:key` |
+| آپلود قدیمی | `POST /api/uploads` | `POST /uploads` — سازگاری؛ جریان اصلی گالری است |
 
 ### `POST /products` body
 
@@ -114,6 +123,19 @@ ADMIN_ORIGIN=http://localhost:3000
 نمونه: `۱۲۸٬۰۰۰٬۰۰۰ تومان` → `1_280_000_000` IRR. تبدیل در `lib/format.ts` (`TOMAN_TO_IRR`).
 
 اسلاگ اختیاری است؛ دکمه «تولید خودکار» از نام لاتین slug می‌سازد و برای نمونه سولیتر مقدار `solitaire-diamond-ring` را می‌گذارد.
+
+## Gallery upload (ANG-A3)
+
+آپلود از مرورگر مستقیم به S3 نمی‌رود مگر `uploadUrl` امضاشده باشد. جریان:
+
+1. `POST /api/gallery/presign` با `{ filename, contentType, size }`
+2. `PUT` بایت فایل به `uploadUrl` (برای mock، BFF آن را به `/api/gallery/upload/:key` بازنویسی می‌کند تا JWT httpOnly همراه شود)
+3. `POST /api/gallery` برای ثبت متادیتا و گرفتن `id`
+4. تازه‌سازی گرید / پیوست به محصول با `imageIds[]`
+
+قالب مجاز: JPG / PNG / WebP تا ۱۲ مگابایت و MP4 تا ۵۰ مگابایت. اگر بک‌اند در دسترس نباشد صفحه گالری و مودال انتخاب خطا را نشان می‌دهند.
+
+از افزودن/ویرایش محصول، «انتخاب از گالری» چند فایل را با ترتیب انتخاب می‌کند؛ تصویر اول تصویر اصلی کارت است.
 
 ## Sample product (۰.۸ قیراط)
 

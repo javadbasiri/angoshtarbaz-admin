@@ -101,8 +101,78 @@ export function SearchIcon() {
   );
 }
 
-export function NavIcon({ name }: { name: "products" | "orders" | "settings" }) {
+export function GalleryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="10" r="1.5" />
+      <path d="M3 16l5-4 4 3 4-5 5 6" />
+    </svg>
+  );
+}
+
+export function UploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 16V7M8 10l4-4 4 4" />
+      <path d="M4 18h16" />
+    </svg>
+  );
+}
+
+export function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+      <path d="M5 7h14M10 11v6M14 11v6M8 7l1-2h6l1 2M7 7l1 12h8l1-12" />
+    </svg>
+  );
+}
+
+export function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+export function PersonPlaceholder({ size = 36 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.25"
+      aria-hidden="true"
+    >
+      <circle cx="24" cy="18" r="6" />
+      <ellipse cx="24" cy="32" rx="10" ry="5" />
+    </svg>
+  );
+}
+
+export function PlayPlaceholder({ size = 36 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <circle cx="24" cy="24" r="14" />
+      <path d="M20 17l12 7-12 7V17z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function NavIcon({ name }: { name: "products" | "gallery" | "orders" | "settings" }) {
   if (name === "orders") return <OrdersIcon />;
   if (name === "settings") return <SettingsIcon />;
+  if (name === "gallery") return <GalleryIcon />;
   return <ProductsIcon />;
 }

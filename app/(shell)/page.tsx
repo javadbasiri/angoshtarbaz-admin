@@ -11,7 +11,7 @@ export default function DashboardPage() {
         </div>
         <div className="panel__body">
           <p style={{ marginBottom: 12, color: "var(--color-muted)" }}>
-            این صفحه چیدمان پوسته را نشان می‌دهد. ناوبری: محصولات (فعال) · سفارشات و تنظیمات
+            این صفحه چیدمان پوسته را نشان می‌دهد. ناوبری: محصولات · رسانه / گالری · سفارشات و تنظیمات
             (به‌زودی).
           </p>
           <p style={{ marginBottom: 16 }}>
@@ -24,6 +24,9 @@ export default function DashboardPage() {
             </Link>
             <Link className="btn btn--secondary" href="/products/prd_solitaire_01/edit">
               ویرایش محصول نمونه →
+            </Link>
+            <Link className="btn btn--secondary" href="/gallery">
+              گالری رسانه →
             </Link>
           </div>
         </div>

@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { PlusIcon, RingPlaceholder } from "@/components/admin/icons";
+import { GalleryPickerModal } from "@/components/gallery/gallery-picker-modal";
 import { formatTomanDisplay, parseTomanInput } from "@/lib/format";
 import { buildPreviewMeta } from "@/lib/product-sample";
 import type { CollectionOption } from "@/types/collection";
+import type { GalleryAsset } from "@/types/gallery";
 import { RING_SIZE_OPTIONS, type ProductFormValues } from "@/types/product";
 import type { FieldErrors } from "@/components/product/use-product-form";
 
@@ -28,6 +30,7 @@ export function ProductFormFields({
   onAddFiles,
   onMoveImage,
   onRemoveImage,
+  onApplyGallerySelection,
 }: {
   values: ProductFormValues;
   errors: FieldErrors;
@@ -42,8 +45,10 @@ export function ProductFormFields({
   onAddFiles: (files: FileList | null) => void;
   onMoveImage: (index: number, direction: -1 | 1) => void;
   onRemoveImage: (index: number) => void;
+  onApplyGallerySelection: (assets: GalleryAsset[]) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const previewMeta = buildPreviewMeta(values.specs, { description: values.description });
   const previewPrice = parseTomanInput(values.priceToman);
   const previewImage = values.gallery[0]?.url;
@@ -333,10 +338,12 @@ export function ProductFormFields({
         </section>
 
         <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">گالری تصاویر</h2>
-            <span className="panel__hint">چند تصویر · ترتیب با جابه‌جایی</span>
-          </div>
+            <div className="panel__head">
+              <h2 className="panel__title">گالری تصاویر</h2>
+              <button type="button" className="gallery-from-library" onClick={() => setPickerOpen(true)}>
+                انتخاب از گالری
+              </button>
+            </div>
           <div className="panel__body">
             <input
               ref={fileInputRef}
@@ -403,11 +410,12 @@ export function ProductFormFields({
                 <span>افزودن تصویر</span>
               </button>
             </div>
-            <p className="field__hint" style={{ marginTop: 12 }}>
-              تصویر اول به‌عنوان تصویر اصلی کارت محصول استفاده می‌شود.
-            </p>
-          </div>
-        </section>
+              <p className="field__hint" style={{ marginTop: 12 }}>
+                تصویر اول به‌عنوان تصویر اصلی کارت محصول استفاده می‌شود. · از «انتخاب از گالری» برای پیوست از
+                کتابخانه مرکزی استفاده کنید.
+              </p>
+            </div>
+          </section>
       </div>
 
       <aside className="add-product__aside">
@@ -445,7 +453,17 @@ export function ProductFormFields({
             </p>
           </div>
         </section>
-      </aside>
+        </aside>
+
+      <GalleryPickerModal
+        open={pickerOpen}
+        initialIds={values.gallery.map((image) => image.remoteId).filter((id): id is string => Boolean(id))}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={(assets) => {
+          onApplyGallerySelection(assets);
+          setPickerOpen(false);
+        }}
+      />
     </div>
   );
 }
