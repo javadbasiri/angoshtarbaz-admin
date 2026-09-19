@@ -18,9 +18,14 @@ export default function DashboardPage() {
             در عرض کمتر از ۹۶۰px، سایدبار به‌صورت کشو باز می‌شود — دکمه همبرگر را در هدر امتحان
             کنید.
           </p>
-          <Link className="btn btn--primary" href="/products/new">
-            رفتن به افزودن محصول →
-          </Link>
+          <div className="page-actions" style={{ justifyContent: "flex-start", paddingBottom: 0 }}>
+            <Link className="btn btn--primary" href="/products/new">
+              رفتن به افزودن محصول →
+            </Link>
+            <Link className="btn btn--secondary" href="/products/prd_solitaire_01/edit">
+              ویرایش محصول نمونه →
+            </Link>
+          </div>
         </div>
       </div>
     </AdminShell>

@@ -1,13 +1,14 @@
 # انگشترباز — Admin
 
-پنل ادمین فروشگاه انگشترباز (مستقل از فروشگاه). RTL فارسی، Vazirmatn، و توکن‌های برند mockupهای ANG-A0 / ANG-A1.
+پنل ادمین فروشگاه انگشترباز (مستقل از فروشگاه). RTL فارسی، Vazirmatn، و توکن‌های برند mockupهای ANG-A0 / ANG-A1 / ANG-A2.
 
 ## Scope
 
 - **ANG-A0** — پوسته ادمین: سایدبار + هدر چسبان + محتوا، برند «انگشترباز» + بج ادمین، ناوبری محصولات (فعال) و سفارشات/تنظیمات به‌زودی. در عرض کمتر از ۹۶۰px کشوی همبرگر +backdrop.
 - **ANG-A1** — افزودن محصول: فرم کامل، پیش‌نمایش کارت زنده، اعتبارسنجی، اسکلتون، بنر/توست موفقیت، اتصال به API.
+- **ANG-A2** — ویرایش محصول: `GET /products/:id` برای پر کردن فرم، `PATCH` برای ذخیره، اسکلتون / یافت‌نشد / خطا با تلاش مجدد / ذخیره / اعتبارسنجی / بنر موفقیت. قیمت UI تومان است و API ریال (÷۱۰ نمایش، ×۱۰ ذخیره).
 - احراز هویت JWT ادمین با کوکی **httpOnly**.
-- خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، دیپلوی.
+- خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، فهرست محصولات، دیپلوی.
 
 ## Stack
 
@@ -25,11 +26,12 @@ npm run dev
 
 ادمین: [http://localhost:3000](http://localhost:3000)
 
-بک‌اند باید روی پورت پیش‌فرض `3001` باشد (`NEXT_PUBLIC_API_URL`). اگر [angoshtarbaz-backend PR #2](https://github.com/javadbasiri/angoshtarbaz-backend/pull/2) در دسترس نیست، API ساختگی محلی را اجرا کنید:
+بک‌اند باید روی پورت پیش‌فرض `3001` باشد (`NEXT_PUBLIC_API_URL`). اگر [angoshtarbaz-backend](https://github.com/javadbasiri/angoshtarbaz-backend) (ایجاد محصول + ویرایش) در دسترس نیست، API ساختگی محلی را اجرا کنید:
 
 ```bash
 npm run mock-api
-# http://localhost:3001  — همان قرارداد login / collections / products
+# http://localhost:3001  — login / collections / products (GET عمومی، PATCH ادمین)
+# نمونه: GET /products/prd_solitaire_01
 ```
 
 سپس در ترمینال دیگر `npm run dev`.
@@ -61,7 +63,9 @@ ADMIN_ORIGIN=http://localhost:3000
 | `/login` | ورود JWT |
 | `/` و `/dashboard` | داشبورد / placeholder داخل پوسته |
 | `/products/new` | افزودن محصول (ANG-A1) |
+| `/products/[id]/edit` | ویرایش محصول (ANG-A2) |
 | `/admin` و `/admin/products/new` | redirect به مسیرهای بالا (سازگاری اسکلت) |
+| `/admin/products/[id]/edit` | redirect به `/products/[id]/edit` |
 
 ## API mapping
 
@@ -74,6 +78,8 @@ ADMIN_ORIGIN=http://localhost:3000
 | نشست | `GET /api/auth/me` | `GET /auth/me` |
 | کالکشن‌ها | `GET /api/collections` | `GET /collections` — اگر نبود، سولیتر / وینتیج / طلای سفید |
 | ایجاد محصول | `POST /api/products` | `POST /products` سپس `GET /products/:id` |
+| خواندن محصول | `GET /api/products/:id` | `GET /products/:id` — عمومی روی بک‌اند (شامل پیش‌نویس)؛ BFF همچنان نشست ادمین می‌خواهد |
+| ویرایش محصول | `PATCH /api/products/:id` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری؛ همان شکل ایجاد |
 | گالری | `POST /api/uploads` | `POST /uploads` (یا `/media`, `/images`) — اختیاری |
 
 ### `POST /products` body
@@ -118,7 +124,9 @@ ADMIN_ORIGIN=http://localhost:3000
 - نگین: برلیان طبیعی ۰.۸ قیراط · رنگ G · شفافیت VS1
 - پیش‌نمایش کارت: «برلیان ۰.۸ قیراط · رکاب طلای ۱۸ عیار»
 
-برای پر کردن فرم با همین نمونه: `/products/new?sample=1`
+برای پر کردن فرم افزودن با همین نمونه: `/products/new?sample=1`
+
+ویرایش همان نمونه روی API ساختگی: `/products/prd_solitaire_01/edit`
 
 ## Scripts
 

@@ -1,3 +1,5 @@
+import type { CollectionOption } from "@/types/collection";
+
 export type ProductStatus = "draft" | "published";
 
 export type ProductSpecs = {
@@ -75,3 +77,34 @@ export type CreatedProduct = {
   slug?: string;
   status?: ProductStatus;
 };
+
+/** Full product as returned by GET /products/:id (create shape; drafts included). */
+export type ProductRecord = {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  /** Integer IRR. */
+  price: number;
+  collectionId: string;
+  collectionName?: string;
+  status: ProductStatus;
+  sizes: number[];
+  specs: ProductSpecs;
+  imageIds: string[];
+  urls: string[];
+  stock?: number;
+};
+
+/** PATCH /products/:id — same keys as create, all optional. */
+export type PatchProductRequest = Partial<CreateProductRequest>;
+
+export type ProductEditLoadState =
+  | { status: "loading" }
+  | { status: "not-found" }
+  | { status: "error"; message: string }
+  | {
+      status: "ready";
+      product: ProductRecord;
+      collections: CollectionOption[];
+    };

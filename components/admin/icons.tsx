@@ -83,6 +83,24 @@ export function CheckIcon() {
   );
 }
 
+export function SearchIcon() {
+  return (
+    <svg
+      width="40"
+      height="40"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.5-3.5" />
+    </svg>
+  );
+}
+
 export function NavIcon({ name }: { name: "products" | "orders" | "settings" }) {
   if (name === "orders") return <OrdersIcon />;
   if (name === "settings") return <SettingsIcon />;

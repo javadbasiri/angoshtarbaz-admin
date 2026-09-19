@@ -1,5 +1,5 @@
 /* ============================================================
-   انگشترباز — Admin shell + Add Product (ANG-A0 / ANG-A1)
+   انگشترباز — Admin shell + Add/Edit Product (ANG-A0 / ANG-A1 / ANG-A2)
    Ported from mockups/admin/admin.css (no design-preview banner)
    ============================================================ */
 
@@ -569,6 +569,8 @@ html[dir="ltr"] .sidebar.is-open,
 }
 
 .btn__spinner {
+  display: inline-block;
+  flex-shrink: 0;
   width: 16px;
   height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.35);
@@ -753,6 +755,14 @@ html[dir="ltr"] .sidebar.is-open,
   box-shadow: var(--focus-ring);
 }
 
+.input:disabled,
+.textarea:disabled,
+.select:disabled {
+  background: var(--color-bg-muted);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
 .textarea {
   min-height: 120px;
   resize: vertical;
@@ -834,6 +844,16 @@ html[dir="rtl"] .input-affix__suffix {
 
 .size-chip:focus-visible {
   box-shadow: var(--focus-ring);
+}
+
+.size-chip:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.size-chip:disabled:hover {
+  border-color: var(--color-border);
+  color: inherit;
 }
 
 .specs-grid {
@@ -1308,4 +1328,146 @@ html[dir="rtl"] .input-affix__suffix {
   color: var(--color-ink);
   font-weight: 600;
   font-family: inherit;
+}
+
+/* ============================================================
+   ANG-A2 — Edit Product extras (no design-preview banner)
+   ============================================================ */
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-12);
+  color: var(--color-muted);
+  margin-bottom: 2px;
+}
+
+.breadcrumb a {
+  color: var(--color-muted);
+  transition: color var(--duration) var(--ease);
+}
+
+.breadcrumb a:hover {
+  color: var(--color-accent);
+}
+
+.breadcrumb__sep {
+  opacity: 0.55;
+  user-select: none;
+}
+
+.breadcrumb__current {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.product-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: var(--space-16);
+  padding: 10px 14px;
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+  font-size: var(--font-size-13);
+  color: var(--color-muted);
+}
+
+.product-meta__label {
+  font-weight: 600;
+  color: var(--color-fg-primary);
+}
+
+.product-meta__id code,
+.product-meta__route,
+.empty-state__route,
+.empty-state code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-4);
+  padding: 2px 6px;
+  color: var(--color-ink);
+}
+
+.product-meta__route {
+  opacity: 0.85;
+}
+
+.page-actions .btn.is-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.is-saving .input,
+.is-saving .textarea,
+.is-saving .select,
+.is-saving .size-chip,
+.is-saving .gallery-add,
+.is-saving .gallery-item__btn,
+.is-saving .radio-card {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.empty-state {
+  max-width: 480px;
+  margin: var(--space-48) auto;
+  text-align: center;
+  padding: var(--space-40) var(--space-24);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-16);
+  box-shadow: var(--shadow-sm);
+}
+
+.empty-state__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto var(--space-20);
+  border-radius: var(--radius-full);
+  background: rgba(84, 25, 38, 0.08);
+  color: var(--color-accent);
+}
+
+.empty-state__icon svg {
+  margin: 0 auto;
+}
+
+.empty-state__title {
+  font-size: var(--font-size-20);
+  font-weight: 700;
+  margin-bottom: var(--space-8);
+}
+
+.empty-state__body {
+  color: var(--color-muted);
+  margin-bottom: var(--space-12);
+  line-height: 1.7;
+}
+
+.empty-state__route {
+  display: inline-block;
+  margin-bottom: var(--space-24);
+}
+
+.empty-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  justify-content: center;
+}
+
+.alert--info .btn__spinner {
+  border-color: rgba(84, 25, 38, 0.2);
+  border-top-color: var(--color-accent);
 }

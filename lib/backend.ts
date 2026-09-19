@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { ApiError } from "@/lib/api";
 import type { AdminUser } from "@/types/auth";
 import type { CollectionOption } from "@/types/collection";
+import { extractProduct } from "@/lib/product-map";
 import type { CreatedProduct } from "@/types/product";
 
 async function readBody(response: Response): Promise<unknown> {
@@ -138,18 +139,13 @@ export function extractId(body: unknown): string | null {
 }
 
 export function extractCreatedProduct(body: unknown): CreatedProduct | null {
-  const id = extractId(body);
-  if (!id) return null;
-  const root = asRecord(body);
-  const data = asRecord(root?.data) ?? asRecord(root?.product) ?? root;
+  const product = extractProduct(body);
+  if (!product) return null;
   return {
-    id,
-    name: typeof data?.name === "string" ? data.name : undefined,
-    slug: typeof data?.slug === "string" ? data.slug : undefined,
-    status:
-      data?.status === "draft" || data?.status === "published"
-        ? data.status
-        : undefined,
+    id: product.id,
+    name: product.name || undefined,
+    slug: product.slug,
+    status: product.status,
   };
 }
 
