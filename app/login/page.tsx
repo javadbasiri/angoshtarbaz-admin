@@ -1,18 +1,26 @@
-import Link from "next/link";
+import { Suspense } from "react";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-full items-center justify-center px-4 py-12">
-      <section className="w-full max-w-sm rounded-xl border border-secondary bg-white p-8 shadow-sm">
-        <p className="text-sm text-muted">ورود به پنل</p>
-        <h1 className="mt-1 text-2xl font-semibold text-primary">انگشترباز</h1>
-        <LoginForm />
-        <p className="mt-6 text-center text-xs text-muted">
-          احراز هویت واقعی در ANG-A0 به بک‌اند وصل می‌شود.{" "}
-          <Link href="/admin" className="text-primary underline">
-            ورود موقت به پنل
-          </Link>
+    <main className="login-page">
+      <section className="login-card">
+        <div className="login-card__brand">
+          <strong className="sidebar__logo">انگشترباز</strong>
+          <span className="sidebar__badge">ادمین</span>
+        </div>
+        <p className="login-card__eyebrow">ورود به پنل</p>
+        <h1 className="login-card__title">انگشترباز</h1>
+        <p className="login-card__lead">
+          برای مدیریت محصولات وارد حساب ادمین شوید. نشست به‌صورت کوکی httpOnly ذخیره می‌شود.
+        </p>
+        <Suspense fallback={<p className="field__hint">در حال بارگذاری فرم ورود…</p>}>
+          <LoginForm />
+        </Suspense>
+        <p className="login-card__seed">
+          حساب نمونه: <strong>admin@angoshtarbaz.local</strong> / <strong>admin123456</strong>
+          <br />
+          API پیش‌فرض: <code>http://localhost:3001</code>
         </p>
       </section>
     </main>

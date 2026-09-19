@@ -1,46 +1,84 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { ApiError, apiFetch } from "@/lib/api";
+
+const SEED_EMAIL = "admin@angoshtarbaz.local";
+const SEED_PASSWORD = "admin123456";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState(SEED_EMAIL);
+  const [password, setPassword] = useState(SEED_PASSWORD);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    router.push("/admin");
+    setPending(true);
+    setError(null);
+    try {
+      await apiFetch({
+        path: "/api/auth/login",
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      const next = searchParams.get("next") || "/";
+      router.push(next);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "ورود ناموفق بود.");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
-    <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="text-sm font-medium text-primary">
+    <form className="form-grid" onSubmit={handleSubmit}>
+      {error ? (
+        <div className="alert alert--error" role="alert">
+          <div>
+            <p className="alert__title">ورود انجام نشد</p>
+            <p className="alert__body">{error}</p>
+          </div>
+        </div>
+      ) : null}
+      <div className="field">
+        <label className="field__label" htmlFor="email">
           ایمیل
         </label>
         <input
+          className="input"
           id="email"
           name="email"
           type="email"
           autoComplete="username"
-          className="rounded-md border border-secondary px-3 py-2 text-sm outline-none focus:border-primary"
+          dir="ltr"
+          style={{ textAlign: "left" }}
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          required
         />
       </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="text-sm font-medium text-primary">
+      <div className="field">
+        <label className="field__label" htmlFor="password">
           رمز عبور
         </label>
         <input
+          className="input"
           id="password"
           name="password"
           type="password"
           autoComplete="current-password"
-          className="rounded-md border border-secondary px-3 py-2 text-sm outline-none focus:border-primary"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          required
         />
       </div>
-      <button
-        type="submit"
-        className="w-full rounded-md bg-primary px-3 py-2.5 text-sm text-canvas"
-      >
+      <button type="submit" className={`btn btn--primary${pending ? " is-loading" : ""}`} disabled={pending}>
+        {pending ? <span className="btn__spinner" aria-hidden="true" /> : null}
         ورود
       </button>
     </form>

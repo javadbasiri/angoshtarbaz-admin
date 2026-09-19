@@ -5,6 +5,7 @@
   "description": "انگشترباز admin panel (Next.js App Router)",
   "scripts": {
     "dev": "next dev",
+    "mock-api": "node scripts/mock-api.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

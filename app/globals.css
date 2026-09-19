@@ -1,24 +1,33 @@
 @import "tailwindcss";
+@import "./admin.css";
 
 :root {
   --primary: #541926;
+  --primary-strong: #3f121c;
   --secondary: #e0e0e0;
   --canvas: #f8f4ec;
-  --foreground: #1f1a1c;
-  --muted: #6b5e62;
+  --surface: #ffffff;
+  --ink: #1c1917;
+  --muted: #78716c;
+  --border: #e7e0d4;
+  --foreground: #1c1917;
 }
 
 @theme inline {
   --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
   --color-secondary: var(--secondary);
   --color-canvas: var(--canvas);
-  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
   --font-sans: var(--font-vazirmatn);
 }
 
 body {
   background: var(--canvas);
   color: var(--foreground);
-  font-family: var(--font-vazirmatn), Tahoma, sans-serif;
+  font-family: var(--font-vazirmatn), Vazirmatn, Tahoma, sans-serif;
 }

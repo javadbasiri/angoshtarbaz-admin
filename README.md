@@ -1,16 +1,19 @@
 # انگشترباز — Admin
 
-پنل ادمین فروشگاه انگشترباز (پروژه جدا از فروشگاه).
+پنل ادمین فروشگاه انگشترباز (مستقل از فروشگاه). RTL فارسی، Vazirmatn، و توکن‌های برند mockupهای ANG-A0 / ANG-A1.
 
 ## Scope
-- Admin shell (ANG-A0)
-- Add Product (ANG-A1)
+
+- **ANG-A0** — پوسته ادمین: سایدبار + هدر چسبان + محتوا، برند «انگشترباز» + بج ادمین، ناوبری محصولات (فعال) و سفارشات/تنظیمات به‌زودی. در عرض کمتر از ۹۶۰px کشوی همبرگر +backdrop.
+- **ANG-A1** — افزودن محصول: فرم کامل، پیش‌نمایش کارت زنده، اعتبارسنجی، اسکلتون، بنر/توست موفقیت، اتصال به API.
+- احراز هویت JWT ادمین با کوکی **httpOnly**.
+- خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، دیپلوی.
 
 ## Stack
-- Next.js App Router + TypeScript
-- Tailwind CSS
-- RTL (`lang="fa"` / `dir="rtl"`) + [Vazirmatn](https://fonts.google.com/specimen/Vazirmatn)
-- Brand tokens: primary `#541926`, secondary `#E0E0E0`, canvas `#F8F4EC`
+
+- Next.js App Router + TypeScript + Tailwind
+- `lang="fa"` / `dir="rtl"` + [Vazirmatn](https://fonts.google.com/specimen/Vazirmatn)
+- برند: Primary `#541926` · Strong `#3F121C` · Secondary `#E0E0E0` · Canvas `#F8F4EC` · Surface `#FFFFFF` · Ink `#1C1917` · Muted `#78716C` · Border `#E7E0D4`
 
 ## Setup
 
@@ -20,27 +23,114 @@ cp .env.example .env.local
 npm run dev
 ```
 
-App: [http://localhost:3000](http://localhost:3000)
+ادمین: [http://localhost:3000](http://localhost:3000)
 
-`NEXT_PUBLIC_API_BASE_URL` must point at **angoshtarbaz-backend** (see `.env.example`).
+بک‌اند باید روی پورت پیش‌فرض `3001` باشد (`NEXT_PUBLIC_API_URL`). اگر [angoshtarbaz-backend PR #2](https://github.com/javadbasiri/angoshtarbaz-backend/pull/2) در دسترس نیست، API ساختگی محلی را اجرا کنید:
+
+```bash
+npm run mock-api
+# http://localhost:3001  — همان قرارداد login / collections / products
+```
+
+سپس در ترمینال دیگر `npm run dev`.
+
+### CORS
+
+بک‌اند `ADMIN_ORIGIN` را پیش‌فرض `http://localhost:3001` می‌گذارد. این پنل روی **۳۰۰۰** اجرا می‌شود؛ برای توسعه محلی یکی از این‌ها را روی بک‌اند ست کنید:
+
+```bash
+ADMIN_ORIGIN=http://localhost:3000
+```
+
+یا در محیط محلی بدون env، بک‌اند Origin را reflect می‌کند.
+
+## Seed
+
+| | |
+| --- | --- |
+| ایمیل | `admin@angoshtarbaz.local` |
+| رمز | `admin123456` |
+| نقش | `admin` (JWT) |
+
+ورود از `/login` به `POST {API}/auth/login` پروکسی می‌شود و توکن در کوکی httpOnly `angoshtarbaz_admin_session` ذخیره می‌گردد. مسیرهای ادمین بدون نشست به `/login` می‌روند.
+
+## Routes
+
+| Path | |
+| --- | --- |
+| `/login` | ورود JWT |
+| `/` و `/dashboard` | داشبورد / placeholder داخل پوسته |
+| `/products/new` | افزودن محصول (ANG-A1) |
+| `/admin` و `/admin/products/new` | redirect به مسیرهای بالا (سازگاری اسکلت) |
+
+## API mapping
+
+پنل مرورگر را مستقیم به بک‌اند وصل نمی‌کند؛ درخواست‌ها از BFF همین اپ (`/api/*`) با هدر `Authorization: Bearer <jwt>` فوروارد می‌شوند.
+
+| Admin UI | BFF | Backend |
+| --- | --- | --- |
+| ورود | `POST /api/auth/login` | `POST /auth/login` (fallback: `/auth/signin`, `/login`) |
+| خروج | `POST /api/auth/logout` | پاک کردن کوکی |
+| نشست | `GET /api/auth/me` | `GET /auth/me` |
+| کالکشن‌ها | `GET /api/collections` | `GET /collections` — اگر نبود، سولیتر / وینتیج / طلای سفید |
+| ایجاد محصول | `POST /api/products` | `POST /products` سپس `GET /products/:id` |
+| گالری | `POST /api/uploads` | `POST /uploads` (یا `/media`, `/images`) — اختیاری |
+
+### `POST /products` body
+
+```json
+{
+  "name": "انگشتر سولیتر الماس",
+  "slug": "solitaire-diamond-ring",
+  "description": "… برلیان گرد ۰.۸ قیراط …",
+  "price": 1280000000,
+  "collectionId": "solitaire",
+  "status": "published",
+  "sizes": [50, 52, 54, 56, 58],
+  "specs": {
+    "weight": "۳٫۲ گرم",
+    "karat": "طلای ۱۸ عیار (۷۵۰)",
+    "gem": "برلیان طبیعی ۰.۸ قیراط · رنگ G · شفافیت VS1",
+    "cut": "برلیان گرد (Round Brilliant) · ۵۷ وجه",
+    "band": "طلای زرد ۱۸ عیار · بزل چهارچنگ دست‌ساز"
+  },
+  "imageIds": [],
+  "urls": []
+}
+```
+
+### قیمت: تومان → ریال
+
+رابط کاربری قیمت را **تومان** نشان می‌دهد (مثل mockup). فیلد بک‌اند `price` عدد صحیح **IRR (ریال)** است.
+
+`1 تومان = 10 ریال` → `priceIRR = toman * 10`
+
+نمونه: `۱۲۸٬۰۰۰٬۰۰۰ تومان` → `1_280_000_000` IRR. تبدیل در `lib/format.ts` (`TOMAN_TO_IRR`).
+
+اسلاگ اختیاری است؛ دکمه «تولید خودکار» از نام لاتین slug می‌سازد و برای نمونه سولیتر مقدار `solitaire-diamond-ring` را می‌گذارد.
+
+## Sample product (۰.۸ قیراط)
+
+همهٔ نمونه‌ها **۰.۸ / 0.8** هستند — هرگز 0.75 / ۰.۷۵.
+
+- نام: انگشتر سولیتر الماس
+- قیمت: ۱۲۸٬۰۰۰٬۰۰۰ تومان
+- نگین: برلیان طبیعی ۰.۸ قیراط · رنگ G · شفافیت VS1
+- پیش‌نمایش کارت: «برلیان ۰.۸ قیراط · رکاب طلای ۱۸ عیار»
+
+برای پر کردن فرم با همین نمونه: `/products/new?sample=1`
 
 ## Scripts
 
-| Command | Description |
+| Command | |
 | --- | --- |
-| `npm i` | Install dependencies |
-| `npm run dev` | Start the Next.js dev server |
-| `npm run build` | Production build |
-| `npm run start` | Serve the production build |
+| `npm i` | نصب وابستگی‌ها |
+| `npm run dev` | Next.js روی :3000 |
+| `npm run mock-api` | API ساختگی روی :3001 |
+| `npm run build` | بیلد پروداکشن |
+| `npm run start` | سرو بیلد |
 | `npm run lint` | ESLint |
 
-## Routes (scaffold)
+## Env
 
-| Path | Status |
-| --- | --- |
-| `/` | Redirects to `/login` |
-| `/login` | Login stub |
-| `/admin` | Admin shell (sidebar + dashboard placeholder) |
-| `/admin/products/new` | Add Product form structure (name, slug, description, price, collection, status, sizes, specs, gallery) |
-
-Auth, API wiring, and UI polish are intentionally out of scope for this bootstrap.
+`NEXT_PUBLIC_API_URL` (پیش‌فرض `http://localhost:3001`) را در `.env.local` بگذارید. جزئیات در `.env.example`.

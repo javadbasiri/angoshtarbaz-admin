@@ -2,41 +2,68 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NavIcon } from "@/components/admin/icons";
+import { useAdminShell } from "@/components/admin/shell-context";
 import { ADMIN_NAV } from "@/lib/nav";
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { sidebarOpen, setSidebarOpen } = useAdminShell();
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-l border-secondary bg-primary text-canvas">
-      <div className="border-b border-white/15 px-5 py-6">
-        <Link href="/admin" className="block text-lg font-semibold">
+    <aside
+      className={`sidebar${sidebarOpen ? " is-open" : ""}`}
+      id="sidebar"
+      aria-label="ناوبری ادمین"
+    >
+      <div className="sidebar__brand">
+        <Link href="/" className="sidebar__logo" onClick={() => setSidebarOpen(false)}>
           انگشترباز
         </Link>
-        <p className="mt-1 text-xs text-canvas/70">پنل مدیریت</p>
+        <span className="sidebar__badge">ادمین</span>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 p-3" aria-label="منوی ادمین">
-        {ADMIN_NAV.map((item) => {
+      <nav className="sidebar__nav">
+        <div className="sidebar__section-label">فروشگاه</div>
+        {ADMIN_NAV.filter((item) => item.section === "store").map((item) => {
+          if (item.soon || !item.href) {
+            return (
+              <span key={item.label} className="nav-item is-placeholder" aria-disabled="true">
+                <NavIcon name={item.icon} />
+                <span>{item.label}</span>
+                <span className="nav-item__soon">به‌زودی</span>
+              </span>
+            );
+          }
+
           const active =
-            item.href === "/admin"
-              ? pathname === "/admin"
-              : pathname.startsWith(item.href);
+            pathname === "/" ||
+            pathname.startsWith("/dashboard") ||
+            pathname.startsWith("/products") ||
+            pathname.startsWith("/admin");
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`rounded-md px-3 py-2 text-sm transition-colors ${
-                active
-                  ? "bg-canvas text-primary"
-                  : "text-canvas/90 hover:bg-white/10"
-              }`}
+              className={`nav-item${active ? " is-active" : ""}`}
+              aria-current={active ? "page" : undefined}
+              onClick={() => setSidebarOpen(false)}
             >
-              {item.label}
+              <NavIcon name={item.icon} />
+              <span>{item.label}</span>
             </Link>
           );
         })}
+        <div className="sidebar__section-label">سیستم</div>
+        {ADMIN_NAV.filter((item) => item.section === "system").map((item) => (
+          <span key={item.label} className="nav-item is-placeholder" aria-disabled="true">
+            <NavIcon name={item.icon} />
+            <span>{item.label}</span>
+            <span className="nav-item__soon">به‌زودی</span>
+          </span>
+        ))}
       </nav>
+      <div className="sidebar__footer">نسخه · ANG-A1</div>
     </aside>
   );
 }

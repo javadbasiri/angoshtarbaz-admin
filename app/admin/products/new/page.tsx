@@ -1,13 +1,5 @@
-import { AdminHeader } from "@/components/admin/header";
-import { ProductForm } from "@/components/product/product-form";
+import { redirect } from "next/navigation";
 
-export default function NewProductPage() {
-  return (
-    <>
-      <AdminHeader title="افزودن محصول" />
-      <main className="flex-1 p-6">
-        <ProductForm />
-      </main>
-    </>
-  );
+export default function AdminNewProductAliasPage() {
+  redirect("/products/new");
 }

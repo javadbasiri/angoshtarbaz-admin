@@ -1,8 +1,19 @@
-const DEFAULT_API_BASE_URL = "http://localhost:4000";
+const DEFAULT_API_URL = "http://localhost:3001";
 
+function trimSlash(value: string) {
+  return value.replace(/\/$/, "");
+}
+
+/**
+ * Backend origin for angoshtarbaz-backend.
+ * Prefers `NEXT_PUBLIC_API_URL` (ANG-A0 contract) and still accepts the
+ * scaffold alias `NEXT_PUBLIC_API_BASE_URL`.
+ */
 export const env = {
-  /** angoshtarbaz-backend origin (no trailing slash). */
-  apiBaseUrl:
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-    DEFAULT_API_BASE_URL,
+  apiUrl: trimSlash(
+    process.env.NEXT_PUBLIC_API_URL ??
+      process.env.NEXT_PUBLIC_API_BASE_URL ??
+      DEFAULT_API_URL,
+  ),
+  loginPath: process.env.API_LOGIN_PATH?.replace(/\/$/, "") || "/auth/login",
 } as const;
