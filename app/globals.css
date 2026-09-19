@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #541926;
+  --secondary: #e0e0e0;
+  --canvas: #f8f4ec;
+  --foreground: #1f1a1c;
+  --muted: #6b5e62;
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-canvas: var(--canvas);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-vazirmatn);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--foreground);
+  font-family: var(--font-vazirmatn), Tahoma, sans-serif;
+}
