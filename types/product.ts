@@ -1,3 +1,5 @@
+import type { CollectionOption } from "@/types/collection";
+
 export type ProductStatus = "draft" | "published";
 
 export type ProductSpecs = {
@@ -96,3 +98,13 @@ export type ProductRecord = {
 
 /** PATCH /products/:id — same keys as create, all optional. */
 export type PatchProductRequest = Partial<CreateProductRequest>;
+
+export type ProductEditLoadState =
+  | { status: "loading" }
+  | { status: "not-found" }
+  | { status: "error"; message: string }
+  | {
+      status: "ready";
+      product: ProductRecord;
+      collections: CollectionOption[];
+    };

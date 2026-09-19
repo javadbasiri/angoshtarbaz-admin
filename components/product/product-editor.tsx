@@ -9,15 +9,9 @@ import { ProductFormFields } from "@/components/product/product-form-fields";
 import { ProductFormSkeleton } from "@/components/product/product-skeleton";
 import { useProductForm } from "@/components/product/use-product-form";
 import { apiFetch, ApiError } from "@/lib/api";
-import { extractProduct, productToFormValues } from "@/lib/product-map";
+import { extractProduct, productToFormValues, withProductCollection } from "@/lib/product-map";
 import { FALLBACK_COLLECTIONS, type CollectionOption } from "@/types/collection";
-import type { ProductRecord, ProductStatus } from "@/types/product";
-
-type LoadState =
-  | { status: "loading" }
-  | { status: "not-found" }
-  | { status: "error"; message: string }
-  | { status: "ready"; product: ProductRecord; collections: CollectionOption[] };
+import type { ProductEditLoadState, ProductRecord, ProductStatus } from "@/types/product";
 
 function parseCollections(payload: unknown): CollectionOption[] {
   if (Array.isArray(payload)) return payload as CollectionOption[];
@@ -27,27 +21,22 @@ function parseCollections(payload: unknown): CollectionOption[] {
   return [];
 }
 
-function withProductCollection(
-  list: CollectionOption[],
-  product: ProductRecord,
-): CollectionOption[] {
-  if (!product.collectionId) return list;
-  if (list.some((item) => item.id === product.collectionId)) return list;
-  return [
-    ...list,
-    { id: product.collectionId, name: product.collectionName || product.collectionId },
-  ];
-}
-
 function editRoute(productId: string) {
   return `/admin/products/${productId}/edit`;
 }
 
-export function ProductEditor({ productId }: { productId: string }) {
-  const [load, setLoad] = useState<LoadState>({ status: "loading" });
+export function ProductEditor({
+  productId,
+  initialLoad,
+}: {
+  productId: string;
+  initialLoad: ProductEditLoadState;
+}) {
+  const [load, setLoad] = useState<ProductEditLoadState>(initialLoad);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
+    if (reloadToken === 0) return;
     let cancelled = false;
 
     async function loadProduct() {

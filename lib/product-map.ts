@@ -1,4 +1,5 @@
 import { formatTomanDisplay, irrToToman, tomanToIrr, parseTomanInput } from "@/lib/format";
+import type { CollectionOption } from "@/types/collection";
 import {
   emptyProductFormValues,
   RING_SIZE_OPTIONS,
@@ -217,4 +218,16 @@ export function formValuesToPayload(
   if (Number.isFinite(stock)) payload.stock = stock;
 
   return payload;
+}
+
+export function withProductCollection(
+  list: CollectionOption[],
+  product: ProductRecord,
+): CollectionOption[] {
+  if (!product.collectionId) return list;
+  if (list.some((item) => item.id === product.collectionId)) return list;
+  return [
+    ...list,
+    { id: product.collectionId, name: product.collectionName || product.collectionId },
+  ];
 }
