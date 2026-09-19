@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavIcon } from "@/components/admin/icons";
 import { useAdminShell } from "@/components/admin/shell-context";
-import { ADMIN_NAV } from "@/lib/nav";
+import { ADMIN_NAV, navItemIsActive } from "@/lib/nav";
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -35,11 +35,7 @@ export function AdminSidebar() {
             );
           }
 
-          const active =
-            pathname === "/" ||
-            pathname.startsWith("/dashboard") ||
-            pathname.startsWith("/products") ||
-            pathname.startsWith("/admin");
+          const active = navItemIsActive(item, pathname);
 
           return (
             <Link
@@ -63,7 +59,7 @@ export function AdminSidebar() {
           </span>
         ))}
       </nav>
-      <div className="sidebar__footer">نسخه · ANG-A2</div>
+      <div className="sidebar__footer">نسخه · ANG-A3</div>
     </aside>
   );
 }

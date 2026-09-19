@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
 import { formValuesToPayload } from "@/lib/product-map";
 import { formatTomanInput, parseTomanInput, slugifyName } from "@/lib/format";
+import { galleryItemsFromClientPayload } from "@/lib/gallery";
+import { uploadFileToGallery } from "@/lib/gallery-upload";
 import { SAMPLE_PRODUCT } from "@/lib/product-sample";
 import { FALLBACK_COLLECTIONS, type CollectionOption } from "@/types/collection";
+import type { GalleryAsset } from "@/types/gallery";
 import {
   type CreateProductRequest,
   type GalleryImage,
@@ -60,6 +63,43 @@ export function useProductForm({
     const timer = window.setTimeout(() => setToast(null), 4000);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  const galleryHydrateKey = initial.gallery
+    .map((image) => image.remoteId)
+    .filter(Boolean)
+    .join(",");
+
+  useEffect(() => {
+    if (!galleryHydrateKey) return;
+    let cancelled = false;
+    async function hydrateGallery() {
+      try {
+        const payload = await apiFetch<unknown>({ path: "/api/gallery?limit=100" });
+        const library = galleryItemsFromClientPayload(payload);
+        const byId = new Map(library.map((asset) => [asset.id, asset]));
+        if (cancelled) return;
+        setValues((current) => ({
+          ...current,
+          gallery: current.gallery.map((image) => {
+            const asset = image.remoteId ? byId.get(image.remoteId) : undefined;
+            if (!asset) return image;
+            return {
+              ...image,
+              url: asset.publicUrl || image.url,
+              name: asset.filename || image.name,
+              kind: asset.kind,
+            };
+          }),
+        }));
+      } catch {
+        // Keep whatever URLs the product payload already had.
+      }
+    }
+    void hydrateGallery();
+    return () => {
+      cancelled = true;
+    };
+  }, [galleryHydrateKey]);
 
   useEffect(() => {
     if (skipCollectionFetch) return;
@@ -168,6 +208,18 @@ export function useProductForm({
     patch({ gallery: next });
   }
 
+  function applyGallerySelection(assets: GalleryAsset[]) {
+    const selected: GalleryImage[] = assets.map((asset) => ({
+      id: asset.id,
+      url: asset.publicUrl,
+      name: asset.filename,
+      remoteId: asset.id,
+      kind: asset.kind,
+    }));
+    const localOnly = values.gallery.filter((image) => image.file && !image.remoteId);
+    patch({ gallery: [...selected, ...localOnly] });
+  }
+
   function handlePriceChange(raw: string) {
     patch({ priceToman: formatTomanInput(raw) });
   }
@@ -188,24 +240,20 @@ export function useProductForm({
     for (const image of values.gallery) {
       if (image.remoteId) {
         imageIds.push(image.remoteId);
+        if (image.url && !image.url.startsWith("blob:")) urls.push(image.url);
         continue;
       }
       if (!image.file) {
         if (image.url && !image.url.startsWith("blob:")) urls.push(image.url);
         continue;
       }
-      const body = new FormData();
-      body.append("file", image.file);
       try {
-        const uploaded = await apiFetch<{ id?: string; url?: string }>({
-          path: "/api/uploads",
-          method: "POST",
-          body,
-        });
-        if (uploaded.id) imageIds.push(uploaded.id);
-        if (uploaded.url) urls.push(uploaded.url);
-      } catch {
-        // Upload is optional; create/update still proceeds without image ids.
+        const uploaded = await uploadFileToGallery(image.file);
+        imageIds.push(uploaded.id);
+        if (uploaded.publicUrl) urls.push(uploaded.publicUrl);
+      } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError("آپلود تصویر گالری ناموفق بود.", 502);
       }
     }
 
@@ -254,6 +302,7 @@ export function useProductForm({
     addFiles,
     moveImage,
     removeImage,
+    applyGallerySelection,
     buildPayload,
     checkValidity,
   };

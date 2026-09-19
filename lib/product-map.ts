@@ -211,7 +211,7 @@ export function formValuesToPayload(
   const slug = values.slug.trim();
   if (slug) payload.slug = slug;
 
-  if (gallery.imageIds.length) payload.imageIds = gallery.imageIds;
+  payload.imageIds = gallery.imageIds;
   if (gallery.urls.length) payload.urls = gallery.urls;
 
   const stock = Number(values.stock);

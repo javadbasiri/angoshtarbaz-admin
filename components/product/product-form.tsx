@@ -136,6 +136,7 @@ export function ProductForm({ prefillSample = false }: { prefillSample?: boolean
         onAddFiles={form.addFiles}
         onMoveImage={form.moveImage}
         onRemoveImage={form.removeImage}
+        onApplyGallerySelection={form.applyGallerySelection}
       />
 
       {form.toast ? (

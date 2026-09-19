@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./admin.css";
+@import "./gallery.css";
 
 :root {
   --primary: #541926;

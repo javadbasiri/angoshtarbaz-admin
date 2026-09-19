@@ -1,6 +1,7 @@
 /**
- * Optional local stand-in for angoshtarbaz-backend when PR #2 / #3 is not running.
- * Implements login, create product, public GET /products/:id, and admin PATCH.
+ * Optional local stand-in for angoshtarbaz-backend when PR #2 / #3 / #4 is not running.
+ * Implements login, create/edit product, and the ANG-A3 gallery contract
+ * (presign → PUT upload → register → list/delete + public file serve).
  *
  *   node scripts/mock-api.mjs
  *   # listens on http://localhost:3001
@@ -15,6 +16,12 @@ const SEED_PASSWORD = "admin123456";
 const tokens = new Map();
 const products = new Map();
 const uploads = new Map();
+const galleryAssets = new Map();
+const galleryFiles = new Map();
+
+const IMAGE_MAX_BYTES = 12 * 1024 * 1024;
+const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "video/mp4"]);
 
 const collections = [
   { id: "solitaire", name: "سولیتر" },
@@ -52,7 +59,7 @@ function send(res, status, body, origin) {
     "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
   };
   res.writeHead(status, headers);
   res.end(body === undefined ? "" : JSON.stringify(body));
@@ -81,6 +88,25 @@ function requireAdmin(req, res, origin) {
     return null;
   }
   return session;
+}
+
+function publicOrigin(req) {
+  const host = req.headers.host || `127.0.0.1:${PORT}`;
+  return `http://${host}`;
+}
+
+function safeFilename(name) {
+  return String(name || "file")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80);
+}
+
+function galleryKind(mimeType, filename) {
+  const mime = String(mimeType || "").toLowerCase();
+  const name = String(filename || "").toLowerCase();
+  if (mime.startsWith("video/") || name.endsWith(".mp4")) return "video";
+  return "image";
 }
 
 function mergeProduct(existing, payload) {
@@ -141,6 +167,125 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/collections") {
       if (!requireAdmin(req, res, origin)) return;
       send(res, 200, { collections }, origin);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/gallery/presign") {
+      if (!requireAdmin(req, res, origin)) return;
+      const payload = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+      const filename = payload.filename || "upload.bin";
+      const contentType = payload.contentType || payload.mimeType || "application/octet-stream";
+      const size = Number(payload.size || 0);
+      const kind = galleryKind(contentType, filename);
+      if (!ALLOWED_TYPES.has(contentType) && !/\.(jpe?g|png|webp|mp4)$/i.test(filename)) {
+        send(res, 400, { message: "قالب فایل پشتیبانی نمی‌شود." }, origin);
+        return;
+      }
+      if (kind === "image" && size > IMAGE_MAX_BYTES) {
+        send(res, 400, { message: "حجم تصویر بیش از ۱۲ مگابایت است." }, origin);
+        return;
+      }
+      if (kind === "video" && size > VIDEO_MAX_BYTES) {
+        send(res, 400, { message: "حجم ویدیو بیش از ۵۰ مگابایت است." }, origin);
+        return;
+      }
+      const key = `gallery/${randomUUID()}-${safeFilename(filename)}`;
+      send(
+        res,
+        200,
+        {
+          uploadUrl: `${publicOrigin(req)}/gallery/upload/${key}`,
+          headers: { "Content-Type": contentType },
+          key,
+          publicUrl: `${publicOrigin(req)}/gallery/files/${key}`,
+          provider: "mock",
+        },
+        origin,
+      );
+      return;
+    }
+
+    const uploadMatch = url.pathname.match(/^\/gallery\/upload\/(.+)$/);
+    if (uploadMatch && req.method === "PUT") {
+      if (!requireAdmin(req, res, origin)) return;
+      const key = decodeURIComponent(uploadMatch[1]);
+      const buffer = await readBody(req);
+      const contentType = req.headers["content-type"] || "application/octet-stream";
+      galleryFiles.set(key, { buffer, contentType, filename: key.split("/").pop() || key });
+      send(res, 204, undefined, origin);
+      return;
+    }
+
+    const fileMatch = url.pathname.match(/^\/gallery\/files\/(.+)$/);
+    if (fileMatch && req.method === "GET") {
+      const key = decodeURIComponent(fileMatch[1]);
+      const file = galleryFiles.get(key);
+      if (!file) {
+        send(res, 404, { message: "File not found" }, origin);
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": file.contentType,
+        "Content-Length": file.buffer.length,
+        "Access-Control-Allow-Origin": origin || "*",
+        "Cache-Control": "public, max-age=3600",
+      });
+      res.end(file.buffer);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/gallery") {
+      if (!requireAdmin(req, res, origin)) return;
+      const payload = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+      const key = payload.key;
+      if (!key || typeof key !== "string") {
+        send(res, 400, { message: "key is required." }, origin);
+        return;
+      }
+      const file = galleryFiles.get(key);
+      if (!file) {
+        send(res, 400, { message: "فایل هنوز آپلود نشده است." }, origin);
+        return;
+      }
+      const id = randomUUID();
+      const filename = payload.filename || payload.originalName || file.filename;
+      const mimeType = payload.mimeType || payload.contentType || file.contentType;
+      const asset = {
+        id,
+        key,
+        publicUrl: payload.publicUrl || `${publicOrigin(req)}/gallery/files/${key}`,
+        filename,
+        mimeType,
+        size: payload.size ?? file.buffer.length,
+        kind: payload.kind === "video" || payload.kind === "image" ? payload.kind : galleryKind(mimeType, filename),
+        createdAt: new Date().toISOString(),
+      };
+      galleryAssets.set(id, asset);
+      send(res, 201, asset, origin);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/gallery") {
+      if (!requireAdmin(req, res, origin)) return;
+      const data = [...galleryAssets.values()].sort((a, b) =>
+        String(b.createdAt).localeCompare(String(a.createdAt)),
+      );
+      send(res, 200, { data, meta: { total: data.length } }, origin);
+      return;
+    }
+
+    const galleryItemMatch = url.pathname.match(/^\/gallery\/([^/]+)$/);
+    if (galleryItemMatch && req.method === "DELETE") {
+      if (!requireAdmin(req, res, origin)) return;
+      const id = decodeURIComponent(galleryItemMatch[1]);
+      const asset = galleryAssets.get(id);
+      if (!asset) {
+        send(res, 404, { message: "Gallery item not found" }, origin);
+        return;
+      }
+      galleryAssets.delete(id);
+      if (asset.key) galleryFiles.delete(asset.key);
+      send(res, 204, undefined, origin);
       return;
     }
 
@@ -223,4 +368,5 @@ server.listen(PORT, () => {
   console.log(`angoshtarbaz mock API listening on http://localhost:${PORT}`);
   console.log(`seed: ${SEED_EMAIL} / ${SEED_PASSWORD}`);
   console.log(`sample product GET /products/${SEED_SOLITAIRE.id}`);
+  console.log("gallery: POST /gallery/presign · PUT /gallery/upload/:key · POST/GET /gallery");
 });

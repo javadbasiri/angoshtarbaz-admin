@@ -16,6 +16,7 @@ export type GalleryImage = {
   name: string;
   file?: File;
   remoteId?: string;
+  kind?: "image" | "video";
 };
 
 export type ProductFormValues = {
