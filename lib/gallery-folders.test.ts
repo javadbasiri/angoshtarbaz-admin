@@ -5,12 +5,17 @@ import {
   GalleryFoldersError,
   browseGallery,
   createGalleryFoldersStub,
+  extractBrowseGallery,
+  extractFolderTree,
+  extractGalleryFoldersFailure,
+  extractMoveResult,
   folderPresignBody,
   galleryBrowsePath,
   galleryBreadcrumbs,
   galleryFolderDeletePath,
   galleryObjectDeletePath,
   renameFolderBody,
+  resolveGalleryPrefix,
   seedGalleryObjects,
 } from "./gallery-folders.ts";
 import {
@@ -20,7 +25,11 @@ import {
   GALLERY_FOLDERS_PATH,
   GALLERY_FOLDERS_RENAME_PATH,
   GALLERY_OBJECTS_MOVE_PATH,
+  GALLERY_OBJECTS_PATH,
   GALLERY_PRESIGN_PATH,
+  GALLERY_ROOT_PREFIX,
+  GALLERY_TREE_PATH,
+  DEFAULT_GALLERY_PREFIX,
 } from "../types/gallery-folders.ts";
 
 describe("galleryFoldersEnabled", () => {
@@ -43,6 +52,8 @@ describe("Nest path helpers", () => {
     assert.equal(GALLERY_FOLDERS_PATH, "/gallery/folders");
     assert.equal(GALLERY_FOLDERS_RENAME_PATH, "/gallery/folders/rename");
     assert.equal(GALLERY_OBJECTS_MOVE_PATH, "/gallery/objects/move");
+    assert.equal(GALLERY_OBJECTS_PATH, "/gallery/objects");
+    assert.equal(GALLERY_TREE_PATH, "/gallery/tree");
     assert.equal(GALLERY_PRESIGN_PATH, "/gallery/presign");
     assert.equal(
       galleryBrowsePath("gallery/rings/"),
@@ -268,6 +279,22 @@ describe("gallery folders stub", () => {
     assert.equal(red.folders.find((folder) => folder.prefix === "gallery/rings/red/")?.objectCount, 0);
     await client.deleteFolder({ prefix: "gallery/rings/red/" });
   });
+
+  it("deletes several objects by key and restores .keep", async () => {
+    const client = createGalleryFoldersStub();
+    await client.deleteObjects({
+      keys: [
+        "gallery/rings/red/red-solitaire.jpg",
+        "gallery/rings/red/red-side.jpg",
+        "gallery/rings/red/red-detail.jpg",
+        "gallery/rings/red/red-box.jpg",
+      ],
+    });
+    const red = await client.browse({ prefix: "gallery/rings/red/", delimiter: "/" });
+    assert.equal(red.counts.files, 0);
+    const parent = await client.browse({ prefix: "gallery/rings/", delimiter: "/" });
+    assert.equal(parent.folders.some((folder) => folder.prefix === "gallery/rings/red/"), true);
+  });
 });
 
 describe("galleryBreadcrumbs", () => {
@@ -277,6 +304,94 @@ describe("galleryBreadcrumbs", () => {
       { prefix: "gallery/rings/", label: "حلقه‌ها" },
       { prefix: "gallery/rings/red/", label: "قرمز" },
     ]);
+  });
+});
+
+describe("resolveGalleryPrefix", () => {
+  it("opens the gallery root unless the stub demo asks for the filled folder", () => {
+    assert.equal(resolveGalleryPrefix(null), GALLERY_ROOT_PREFIX);
+    assert.equal(resolveGalleryPrefix(""), GALLERY_ROOT_PREFIX);
+    assert.equal(resolveGalleryPrefix("   "), GALLERY_ROOT_PREFIX);
+    assert.equal(resolveGalleryPrefix(null, { demo: true }), DEFAULT_GALLERY_PREFIX);
+    assert.equal(resolveGalleryPrefix("rings/red"), "gallery/rings/red/");
+  });
+});
+
+describe("Nest folder parsers", () => {
+  it("reads browse payloads and hides .keep", () => {
+    const listed = extractBrowseGallery({
+      data: {
+        currentPrefix: "gallery/rings/red",
+        parentPrefix: "gallery/rings/",
+        folders: [],
+        files: [
+          {
+            id: "11111111-1111-1111-1111-111111111111",
+            key: "gallery/rings/red/red-box.jpg",
+            originalName: "red-box.jpg",
+            size: 10,
+            mime: "image/jpeg",
+            updatedAt: "2026-10-01T00:00:00.000Z",
+            publicUrl: "https://cdn.example/red-box.jpg",
+          },
+          { id: null, key: "gallery/rings/red/.keep", name: ".keep", size: 0, contentType: "application/octet-stream" },
+        ],
+        counts: { folders: 0, files: 1 },
+      },
+    });
+    assert.equal(listed?.currentPrefix, "gallery/rings/red/");
+    assert.equal(listed?.parentPrefix, "gallery/rings/");
+    assert.equal(listed?.files.length, 1);
+    assert.equal(listed?.files[0]?.contentType, "image/jpeg");
+    assert.equal(listed?.files[0]?.url, "https://cdn.example/red-box.jpg");
+    assert.equal(listed?.files[0]?.id, "11111111-1111-1111-1111-111111111111");
+  });
+
+  it("maps folder error codes onto the Persian dialog copy", () => {
+    const exists = extractGalleryFoldersFailure(409, { code: "FOLDER_EXISTS", message: "Folder already exists" }, "fail");
+    assert.equal(exists.code, "FOLDER_EXISTS");
+    assert.equal(exists.message, FOLDER_EXISTS_MESSAGE);
+
+    const blocked = extractGalleryFoldersFailure(
+      409,
+      { error: { code: "FOLDER_NOT_EMPTY", objectCount: 4, message: "Folder is not empty" } },
+      "fail",
+    );
+    assert.equal(blocked.code, "FOLDER_NOT_EMPTY");
+    assert.equal(blocked.message, FOLDER_NOT_EMPTY_MESSAGE);
+    assert.equal(blocked.objectCount, 4);
+
+    const inferred = extractGalleryFoldersFailure(409, { message: FOLDER_NOT_EMPTY_MESSAGE, objectCount: 2 }, "fail");
+    assert.equal(inferred.code, "FOLDER_NOT_EMPTY");
+    assert.equal(inferred.objectCount, 2);
+  });
+
+  it("reads move results from strings or from/to objects", () => {
+    const parsed = extractMoveResult({
+      data: {
+        moved: [{ from: "gallery/a/old.jpg", to: "gallery/b/old.jpg" }],
+        skipped: ["gallery/a/stay.jpg"],
+        renamed: [{ key: "gallery/b/old-1.jpg", from: "gallery/a/old.jpg" }],
+      },
+    });
+    assert.deepEqual(parsed, {
+      moved: ["gallery/b/old.jpg"],
+      skipped: ["gallery/a/stay.jpg"],
+      renamed: ["gallery/b/old-1.jpg"],
+    });
+  });
+
+  it("parses a tree, labels known prefixes, and rejects an unrelated body", () => {
+    const tree = extractFolderTree({
+      prefix: "gallery/",
+      name: "gallery",
+      folders: [{ prefix: "gallery/rings/red/", name: "red", objectCount: 4, children: [] }],
+    });
+    assert.equal(tree?.label, "همه فایل‌ها");
+    assert.equal(tree?.children[0]?.label, "قرمز");
+    assert.equal(tree?.children[0]?.objectCount, 4);
+    assert.equal(extractFolderTree({ hello: "nope" }), null);
+    assert.equal(extractFolderTree({ data: { unexpected: true } }), null);
   });
 });
 

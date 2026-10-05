@@ -31,6 +31,11 @@ export const env = {
   ),
   /** Inlined at build time. Restart `next dev` or rebuild after changing it. */
   galleryFolders: galleryFoldersEnabled(process.env.NEXT_PUBLIC_GALLERY_FOLDERS),
+  /**
+   * In-memory folder stub. Only consulted when `galleryFolders` is on.
+   * Same `1` / `true` rule. Default off, so the folder UI talks to Nest.
+   */
+  galleryFoldersStub: galleryFoldersEnabled(process.env.NEXT_PUBLIC_GALLERY_FOLDERS_STUB),
 } as const;
 
 /** Nest admin login. One path — no alternate sign-in routes. */

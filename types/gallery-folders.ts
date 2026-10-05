@@ -2,21 +2,23 @@ import type { GalleryPresign, GalleryRegisterInput } from "@/types/gallery";
 
 /**
  * ANG-A6 Nest contract under `/gallery` (admin JWT).
- * These shapes are what a later Nest adapter must send and accept.
- * This PR does not call Nest — the in-memory stub implements the same interface.
+ * `GalleryFoldersClient` is implemented by the Nest adapter (server actions)
+ * and by the in-memory stub used when `NEXT_PUBLIC_GALLERY_FOLDERS_STUB=1`.
  */
 
 export const GALLERY_ROOT_PREFIX = "gallery/";
 export const GALLERY_DELIMITER = "/" as const;
 export const EMPTY_FOLDER_MARKER = ".keep";
 
-/** Primary filled screen in the ANG-A6 mockup. Used when `?prefix=` is absent. */
+/** Primary filled screen in the ANG-A6 mockup. The stub demo opens this when `?prefix=` is absent. */
 export const DEFAULT_GALLERY_PREFIX = "gallery/rings/red/";
 
 export const GALLERY_BROWSE_PATH = "/gallery/browse";
 export const GALLERY_FOLDERS_PATH = "/gallery/folders";
 export const GALLERY_FOLDERS_RENAME_PATH = "/gallery/folders/rename";
 export const GALLERY_OBJECTS_MOVE_PATH = "/gallery/objects/move";
+export const GALLERY_OBJECTS_PATH = "/gallery/objects";
+export const GALLERY_TREE_PATH = "/gallery/tree";
 export const GALLERY_PRESIGN_PATH = "/gallery/presign";
 export const GALLERY_REGISTER_PATH = "/gallery";
 
@@ -115,8 +117,24 @@ export type GalleryFolderPresignBody = {
   prefix: string;
 };
 
+/** One node from `GET /gallery/tree`, or built from browse when that route is absent. */
+export type GalleryFolderTreeNode = {
+  prefix: string;
+  name: string;
+  label: string;
+  objectCount: number;
+  children: GalleryFolderTreeNode[];
+};
+
+/** `DELETE /gallery/objects` */
+export type GalleryDeleteObjectsBody = {
+  keys: string[];
+};
+
 export type GalleryFoldersClient = {
   browse(query: GalleryBrowseQuery): Promise<GalleryBrowseResult>;
+  /** Optional. `null` means the UI should walk `browse` instead. */
+  tree?(): Promise<GalleryFolderTreeNode | null>;
   createFolder(body: GalleryCreateFolderBody): Promise<GalleryCreateFolderResult>;
   renameFolder(body: GalleryRenameFolderBody): Promise<GalleryRenameFolderResult>;
   /** `DELETE /gallery/folders?prefix=` — 204 when empty, otherwise `FOLDER_NOT_EMPTY`. */
@@ -127,4 +145,6 @@ export type GalleryFoldersClient = {
   register(body: GalleryRegisterInput): Promise<GalleryBrowseFile>;
   /** Existing `DELETE /gallery/:id`. */
   deleteObject(id: string): Promise<void>;
+  /** `DELETE /gallery/objects` `{ keys }` — deletes by object key, including unregistered files. */
+  deleteObjects(body: GalleryDeleteObjectsBody): Promise<void>;
 };

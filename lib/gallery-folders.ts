@@ -1,4 +1,4 @@
-import type { GalleryPresign, GalleryRegisterInput } from "../types/gallery.ts";
+import type { GalleryAsset, GalleryPresign, GalleryRegisterInput } from "../types/gallery.ts";
 import {
   DEFAULT_GALLERY_PREFIX,
   EMPTY_FOLDER_MARKER,
@@ -9,14 +9,17 @@ import {
   GALLERY_FOLDERS_PATH,
   GALLERY_FOLDERS_RENAME_PATH,
   GALLERY_OBJECTS_MOVE_PATH,
+  GALLERY_OBJECTS_PATH,
   GALLERY_PRESIGN_PATH,
   GALLERY_ROOT_PREFIX,
+  GALLERY_TREE_PATH,
   type GalleryBrowseFile,
   type GalleryBrowseResult,
   type GalleryCreateFolderBody,
   type GalleryCreateFolderResult,
   type GalleryFolderEntry,
   type GalleryFolderPresignBody,
+  type GalleryFolderTreeNode,
   type GalleryFoldersClient,
   type GalleryFoldersErrorCode,
   type GalleryMoveObjectsBody,
@@ -27,9 +30,11 @@ import {
 } from "../types/gallery-folders.ts";
 
 /**
- * In-memory ANG-A6 client. Paths and bodies match Nest so a later adapter is a
- * thin swap (server actions + admin JWT). This module never calls Nest.
+ * Pure ANG-A6 folder engine plus the in-memory stub.
+ * Response parsers are shared with the Nest adapter. This module never calls Nest.
  */
+
+export type GalleryFolderNode = GalleryFolderTreeNode;
 
 export class GalleryFoldersError extends Error {
   readonly status: number;
@@ -52,14 +57,6 @@ export type GalleryObjectRecord = {
   contentType: string;
   updatedAt: string;
   url: string;
-};
-
-export type GalleryFolderNode = {
-  prefix: string;
-  name: string;
-  label: string;
-  objectCount: number;
-  children: GalleryFolderNode[];
 };
 
 const KNOWN_FOLDER_ORDER = ["rings", "red", "engagement", "products", "solitaire", "archive"];
@@ -112,8 +109,14 @@ export function normalizePrefix(prefix: string | null | undefined): string {
   return value;
 }
 
-export function resolveGalleryPrefix(raw: string | null | undefined): string {
-  if (raw == null || raw.trim() === "") return DEFAULT_GALLERY_PREFIX;
+/**
+ * Empty query opens the gallery root. The stub demo still opens the filled
+ * `gallery/rings/red/` screen when `demo` is set.
+ */
+export function resolveGalleryPrefix(raw: string | null | undefined, options?: { demo?: boolean }): string {
+  if (raw == null || raw.trim() === "") {
+    return options?.demo ? DEFAULT_GALLERY_PREFIX : GALLERY_ROOT_PREFIX;
+  }
   return normalizePrefix(raw);
 }
 
@@ -176,6 +179,306 @@ export function validateFolderName(name: string): { ok: true; name: string } | {
     return { ok: false, message: "نام پوشه مجاز نیست" };
   }
   return { ok: true, name: trimmed };
+}
+
+const FOLDER_ERROR_CODES = new Set<GalleryFoldersErrorCode>([
+  "VALIDATION",
+  "FOLDER_EXISTS",
+  "FOLDER_NOT_EMPTY",
+  "OBJECT_EXISTS",
+  "NOT_FOUND",
+]);
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function asString(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return undefined;
+}
+
+function asFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function readMessage(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  const record = asRecord(value);
+  if (!record) return undefined;
+  if (Array.isArray(record.message)) {
+    const parts = record.message.filter((item): item is string => typeof item === "string" && Boolean(item.trim()));
+    if (parts.length) return parts.join(" ");
+  }
+  if (typeof record.message === "string" && record.message.trim()) return record.message.trim();
+  if (typeof record.detail === "string" && record.detail.trim()) return record.detail.trim();
+  if (typeof record.error === "string" && record.error.trim() && !FOLDER_ERROR_CODES.has(record.error as GalleryFoldersErrorCode)) {
+    return record.error.trim();
+  }
+  return undefined;
+}
+
+function readCode(value: unknown): string | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  for (const key of ["code", "errorCode"]) {
+    const code = asString(record[key]);
+    if (code && FOLDER_ERROR_CODES.has(code as GalleryFoldersErrorCode)) return code;
+  }
+  if (typeof record.error === "string" && FOLDER_ERROR_CODES.has(record.error as GalleryFoldersErrorCode)) {
+    return record.error;
+  }
+  return undefined;
+}
+
+function readObjectCount(value: unknown): number | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  return (
+    asFiniteNumber(record.objectCount) ??
+    asFiniteNumber(asRecord(record.data)?.objectCount) ??
+    asFiniteNumber(asRecord(record.error)?.objectCount)
+  );
+}
+
+function inferFolderCode(status: number, explicit: string | undefined, message: string | undefined): GalleryFoldersErrorCode {
+  if (explicit && FOLDER_ERROR_CODES.has(explicit as GalleryFoldersErrorCode)) {
+    return explicit as GalleryFoldersErrorCode;
+  }
+  if (message === FOLDER_EXISTS_MESSAGE || /already exists|folder exists/i.test(message ?? "")) return "FOLDER_EXISTS";
+  if (message === FOLDER_NOT_EMPTY_MESSAGE || /not empty|non-empty/i.test(message ?? "")) return "FOLDER_NOT_EMPTY";
+  if (status === 404) return "NOT_FOUND";
+  if (status === 409) return "OBJECT_EXISTS";
+  return "VALIDATION";
+}
+
+/** Map a Nest error body onto the codes the folder dialogs already handle. */
+export function extractGalleryFoldersFailure(
+  status: number,
+  body: unknown,
+  fallback: string,
+): { status: number; code: GalleryFoldersErrorCode; message: string; objectCount?: number } {
+  const record = asRecord(body);
+  const nested = asRecord(record?.error) ?? asRecord(record?.data);
+  const explicit = readCode(record) ?? readCode(nested);
+  const rawMessage = readMessage(nested) ?? readMessage(record) ?? readMessage(body);
+  const code = inferFolderCode(status, explicit, rawMessage);
+  const objectCount = readObjectCount(record) ?? readObjectCount(nested);
+  const message =
+    code === "FOLDER_EXISTS"
+      ? FOLDER_EXISTS_MESSAGE
+      : code === "FOLDER_NOT_EMPTY"
+        ? FOLDER_NOT_EMPTY_MESSAGE
+        : rawMessage || fallback;
+  return {
+    status: status || (code === "FOLDER_EXISTS" || code === "FOLDER_NOT_EMPTY" ? 409 : 400),
+    code,
+    message,
+    ...(objectCount != null ? { objectCount } : {}),
+  };
+}
+
+function parseBrowseFile(value: unknown): GalleryBrowseFile | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const key = asString(record.key);
+  if (!key || isKeepMarker(key)) return null;
+  const name = asString(record.name) ?? asString(record.originalName) ?? asString(record.filename) ?? basename(key);
+  const idRaw = record.id;
+  const id = idRaw == null || idRaw === "" ? null : (asString(idRaw) ?? null);
+  return {
+    id,
+    key,
+    name,
+    size: asFiniteNumber(record.size) ?? asFiniteNumber(record.bytes) ?? 0,
+    contentType:
+      asString(record.contentType) ?? asString(record.mime) ?? asString(record.mimeType) ?? "application/octet-stream",
+    updatedAt: asString(record.updatedAt) ?? asString(record.updated_at) ?? "",
+    url: asString(record.url) ?? asString(record.publicUrl) ?? "",
+  };
+}
+
+function parseFolderEntry(value: unknown, currentPrefix: string): GalleryFolderEntry | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const name = asString(record.name);
+  const prefixRaw = asString(record.prefix);
+  const prefix = prefixRaw ? normalizePrefix(prefixRaw) : name ? `${normalizePrefix(currentPrefix)}${name}/` : "";
+  if (!prefix) return null;
+  return {
+    name: name ?? basename(prefix),
+    prefix,
+    objectCount: asFiniteNumber(record.objectCount) ?? 0,
+  };
+}
+
+/** Accept the browse document, or the same document under `data`. `.keep` is dropped. */
+export function extractBrowseGallery(body: unknown, requestedPrefix?: string): GalleryBrowseResult | null {
+  const root = asRecord(body);
+  if (!root) return null;
+  const dataRecord = asRecord(root.data);
+  const data =
+    dataRecord &&
+    (Array.isArray(dataRecord.folders) ||
+      Array.isArray(dataRecord.files) ||
+      typeof dataRecord.currentPrefix === "string")
+      ? dataRecord
+      : root;
+  if (!Array.isArray(data.folders) && !Array.isArray(data.files) && typeof data.currentPrefix !== "string") {
+    return null;
+  }
+  const currentPrefix = normalizePrefix(asString(data.currentPrefix) ?? requestedPrefix ?? GALLERY_ROOT_PREFIX);
+  const folders = (Array.isArray(data.folders) ? data.folders : [])
+    .map((item) => parseFolderEntry(item, currentPrefix))
+    .filter((item): item is GalleryFolderEntry => item !== null);
+  const files = (Array.isArray(data.files) ? data.files : [])
+    .map((item) => parseBrowseFile(item))
+    .filter((item): item is GalleryBrowseFile => item !== null);
+  let parentPrefix: string | null;
+  if (data.parentPrefix === null || currentPrefix === GALLERY_ROOT_PREFIX) parentPrefix = null;
+  else if (typeof data.parentPrefix === "string") parentPrefix = normalizePrefix(data.parentPrefix);
+  else parentPrefix = parentPrefixOf(currentPrefix);
+  const counts = asRecord(data.counts);
+  return {
+    currentPrefix,
+    parentPrefix,
+    folders,
+    files,
+    counts: {
+      folders: asFiniteNumber(counts?.folders) ?? folders.length,
+      files: asFiniteNumber(counts?.files) ?? files.length,
+    },
+  };
+}
+
+export function extractCreateFolder(body: unknown): GalleryCreateFolderResult | null {
+  const root = asRecord(body);
+  const data = asRecord(root?.data) ?? root;
+  const prefix = asString(data?.prefix);
+  if (!prefix) return null;
+  return { prefix: normalizePrefix(prefix), name: asString(data?.name) ?? basename(prefix) };
+}
+
+export function extractRenameFolder(body: unknown): GalleryRenameFolderResult | null {
+  const root = asRecord(body);
+  const data = asRecord(root?.data) ?? root;
+  const fromPrefix = asString(data?.fromPrefix);
+  const toPrefix = asString(data?.toPrefix);
+  if (!fromPrefix || !toPrefix) return null;
+  return {
+    fromPrefix: normalizePrefix(fromPrefix),
+    toPrefix: normalizePrefix(toPrefix),
+    movedCount: asFiniteNumber(data?.movedCount) ?? 0,
+  };
+}
+
+function keyList(value: unknown, prefer: "to" | "from"): string[] {
+  if (!Array.isArray(value)) return [];
+  const keys: string[] = [];
+  for (const item of value) {
+    if (typeof item === "string" && item.trim()) {
+      keys.push(item);
+      continue;
+    }
+    const record = asRecord(item);
+    if (!record) continue;
+    const preferred =
+      prefer === "to"
+        ? (asString(record.to) ?? asString(record.key) ?? asString(record.from))
+        : (asString(record.from) ?? asString(record.key) ?? asString(record.to));
+    if (preferred) keys.push(preferred);
+  }
+  return keys;
+}
+
+/** Destination keys in `moved` / `renamed`; source keys in `skipped`. Objects may be `{ from, to, key }`. */
+export function extractMoveResult(body: unknown): GalleryMoveResult | null {
+  const root = asRecord(body);
+  const data = asRecord(root?.data) ?? root;
+  if (!data || !("moved" in data || "skipped" in data || "renamed" in data)) return null;
+  return {
+    moved: keyList(data.moved, "to"),
+    skipped: keyList(data.skipped, "from"),
+    renamed: keyList(data.renamed, "to"),
+  };
+}
+
+function applyFolderLabels(node: GalleryFolderTreeNode): GalleryFolderTreeNode {
+  return {
+    ...node,
+    label: node.prefix === GALLERY_ROOT_PREFIX ? "همه فایل‌ها" : galleryFolderLabel(node.prefix, node.name),
+    children: node.children.map(applyFolderLabels),
+  };
+}
+
+function parseTreeNode(value: unknown): GalleryFolderTreeNode | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const prefixRaw = asString(record.prefix);
+  if (!prefixRaw) return null;
+  const prefix = normalizePrefix(prefixRaw);
+  const name = asString(record.name) ?? basename(prefix);
+  const rawChildren = Array.isArray(record.children) ? record.children : Array.isArray(record.folders) ? record.folders : [];
+  const children = rawChildren
+    .map((item) => parseTreeNode(item))
+    .filter((item): item is GalleryFolderTreeNode => item !== null);
+  const explicit = asFiniteNumber(record.objectCount);
+  return {
+    prefix,
+    name,
+    label: name,
+    objectCount: explicit ?? children.reduce((sum, child) => sum + child.objectCount, 0),
+    children,
+  };
+}
+
+function treeFromList(items: unknown[]): GalleryFolderTreeNode | null {
+  const children = items.map((item) => parseTreeNode(item)).filter((item): item is GalleryFolderTreeNode => item !== null);
+  if (items.length > 0 && children.length === 0) return null;
+  return applyFolderLabels({
+    prefix: GALLERY_ROOT_PREFIX,
+    name: "gallery",
+    label: "همه فایل‌ها",
+    objectCount: children.reduce((sum, child) => sum + child.objectCount, 0),
+    children,
+  });
+}
+
+/**
+ * `GET /gallery/tree`. Accepts a rooted node, `{ data }`, `{ folders }`, or a bare array.
+ * Returns null when the body is not a tree so the UI can walk browse instead.
+ */
+export function extractFolderTree(body: unknown): GalleryFolderTreeNode | null {
+  if (Array.isArray(body)) return treeFromList(body);
+  const root = asRecord(body);
+  if (!root) return null;
+  if (!root.prefix && !root.folders && !root.children && asRecord(root.data)) {
+    return extractFolderTree(root.data);
+  }
+  if (!asString(root.prefix) && (Array.isArray(root.folders) || Array.isArray(root.children))) {
+    const list = (Array.isArray(root.folders) ? root.folders : root.children) as unknown[];
+    return treeFromList(list);
+  }
+  const node = parseTreeNode(root);
+  return node ? applyFolderLabels(node) : null;
+}
+
+export function browseFileFromAsset(asset: GalleryAsset, input: GalleryRegisterInput): GalleryBrowseFile {
+  return {
+    id: asset.id,
+    key: asset.key ?? input.key,
+    name: asset.filename || input.filename,
+    size: asset.size,
+    contentType: asset.mimeType,
+    updatedAt: asset.createdAt ?? new Date().toISOString(),
+    url: asset.publicUrl,
+  };
 }
 
 function fail(status: number, code: GalleryFoldersErrorCode, message: string, objectCount?: number): never {
@@ -457,6 +760,17 @@ export function deleteObjectRecord(objects: readonly GalleryObjectRecord[], id: 
   return next;
 }
 
+/** `DELETE /gallery/objects` `{ keys }`. Re-adds `.keep` when a folder would disappear. */
+export function deleteObjectRecords(objects: readonly GalleryObjectRecord[], keys: readonly string[]): GalleryObjectRecord[] {
+  if (!keys.length) fail(400, "VALIDATION", "فایلی انتخاب نشده است");
+  const missing = keys.filter((key) => !objects.some((item) => item.key === key && !isKeepMarker(item.key)));
+  if (missing.length) fail(404, "NOT_FOUND", "فایل پیدا نشد");
+  const drop = new Set(keys);
+  const next = objects.filter((item) => !drop.has(item.key)).map((item) => ({ ...item }));
+  for (const key of keys) ensureEmptyMarker(next, fileParent(key));
+  return next;
+}
+
 function image(key: string, id: string, size: number, contentType = "image/jpeg"): GalleryObjectRecord {
   return { key, id, size, contentType, updatedAt: SEED_UPDATED_AT, url: "" };
 }
@@ -521,15 +835,10 @@ export function createGalleryFoldersStub(initial?: readonly GalleryObjectRecord[
     async deleteObject(id) {
       objects = deleteObjectRecord(objects, id);
     },
+    async deleteObjects(body) {
+      objects = deleteObjectRecords(objects, body.keys);
+    },
   };
-}
-
-let singleton: GalleryFoldersClient | null = null;
-
-/** Stub today. Replace this body with a Nest adapter that uses the path helpers above. */
-export function getGalleryFoldersClient(): GalleryFoldersClient {
-  singleton ??= createGalleryFoldersStub();
-  return singleton;
 }
 
 export async function loadGalleryFolderTree(client: GalleryFoldersClient): Promise<GalleryFolderNode> {
@@ -549,9 +858,11 @@ export async function loadGalleryFolderTree(client: GalleryFoldersClient): Promi
 
 export const GALLERY_FOLDERS_NEST_PATHS = {
   browse: GALLERY_BROWSE_PATH,
+  tree: GALLERY_TREE_PATH,
   createFolder: GALLERY_FOLDERS_PATH,
   renameFolder: GALLERY_FOLDERS_RENAME_PATH,
   deleteFolder: GALLERY_FOLDERS_PATH,
   moveObjects: GALLERY_OBJECTS_MOVE_PATH,
+  deleteObjects: GALLERY_OBJECTS_PATH,
   presign: GALLERY_PRESIGN_PATH,
 } as const;

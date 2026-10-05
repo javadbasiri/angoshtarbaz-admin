@@ -7,16 +7,17 @@ import { FolderDialogs, useDialogFocus, type FolderDialog } from "@/components/g
 import { FolderGlyph, MoveGlyph } from "@/components/gallery/folder-icons";
 import { FolderTree } from "@/components/gallery/folder-tree";
 import { MediaThumb } from "@/components/gallery/media-thumb";
+import { env } from "@/lib/env";
 import { formatFileSize, galleryKindFrom, isAllowedGalleryFile } from "@/lib/gallery";
+import { getGalleryFoldersClient, loadFoldersTree } from "@/lib/gallery-folders-client";
 import {
   GalleryFoldersError,
   galleryBreadcrumbs,
-  getGalleryFoldersClient,
-  loadGalleryFolderTree,
   parentPrefixOf,
   resolveGalleryPrefix,
   type GalleryFolderNode,
 } from "@/lib/gallery-folders";
+import { putGalleryBytes } from "@/lib/gallery-upload";
 import { toPersianDigits } from "@/lib/format";
 import {
   FOLDER_NOT_EMPTY_MESSAGE,
@@ -73,7 +74,7 @@ function rewritePrefix(current: string, fromPrefix: string, toPrefix: string) {
 export function GalleryFoldersLibrary() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const currentPrefix = resolveGalleryPrefix(searchParams.get("prefix"));
+  const currentPrefix = resolveGalleryPrefix(searchParams.get("prefix"), { demo: env.galleryFoldersStub });
   const [page, setPage] = useState<GalleryBrowseResult | null>(null);
   const [tree, setTree] = useState<GalleryFolderNode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,7 +102,7 @@ export function GalleryFoldersLibrary() {
       try {
         const [listed, nextTree] = await Promise.all([
           client.browse({ prefix: currentPrefix, delimiter: GALLERY_DELIMITER }),
-          loadGalleryFolderTree(client),
+          loadFoldersTree(client),
         ]);
         if (cancelled) return;
         setPage(listed);
@@ -324,25 +325,19 @@ export function GalleryFoldersLibrary() {
     );
     if (!confirmed) return;
     setBusy(true);
-    const client = getGalleryFoldersClient();
-    let failed = 0;
-    for (const key of keys) {
-      const file = files.find((item) => item.key === key);
-      if (!file?.id) {
-        failed += 1;
-        continue;
-      }
-      try {
-        await client.deleteObject(file.id);
-      } catch {
-        failed += 1;
-      }
+    try {
+      await getGalleryFoldersClient().deleteObjects({ keys });
+      setSelected([]);
+      setToast({ kind: "success", text: keys.length === 1 ? "فایل حذف شد" : "فایل‌های انتخاب‌شده حذف شدند" });
+      reload();
+    } catch (error) {
+      setToast({
+        kind: "error",
+        text: error instanceof GalleryFoldersError ? error.message : "حذف فایل ناموفق بود.",
+      });
+    } finally {
+      setBusy(false);
     }
-    setSelected([]);
-    if (failed) setToast({ kind: "error", text: `${toPersianDigits(failed)} فایل حذف نشد.` });
-    else setToast({ kind: "success", text: keys.length === 1 ? "فایل حذف شد" : "فایل‌های انتخاب‌شده حذف شدند" });
-    setBusy(false);
-    reload();
   }
 
   async function runUpload(tile: UploadTile) {
@@ -351,28 +346,28 @@ export function GalleryFoldersLibrary() {
       const allowed = isAllowedGalleryFile(tile.file);
       if (!allowed.ok) throw new GalleryFoldersError(400, "VALIDATION", allowed.message);
       const contentType = tile.file.type || (allowed.kind === "video" ? "video/mp4" : "image/jpeg");
-      setUploads((current) => current.map((item) => (item.localId === tile.localId ? { ...item, progress: 30 } : item)));
+      setUploads((current) => current.map((item) => (item.localId === tile.localId ? { ...item, progress: 18 } : item)));
       const presign = await client.presign({
         filename: tile.file.name,
         mime: contentType,
         size: tile.file.size,
         prefix: currentPrefix,
       });
-      setUploads((current) => current.map((item) => (item.localId === tile.localId ? { ...item, progress: 70 } : item)));
       if (presign.provider !== "stub") {
-        setUploads((current) =>
-          current.map((item) =>
-            item.localId === tile.localId
-              ? { ...item, status: "error", error: "آپلود واقعی هنوز به Nest وصل نیست." }
-              : item,
-          ),
-        );
-        return;
+        await putGalleryBytes(presign.uploadUrl, tile.file, presign.headers, (percent) => {
+          const progress = 18 + Math.round(percent * 0.7);
+          setUploads((current) =>
+            current.map((item) => (item.localId === tile.localId ? { ...item, progress } : item)),
+          );
+        });
+      } else {
+        setUploads((current) => current.map((item) => (item.localId === tile.localId ? { ...item, progress: 70 } : item)));
       }
+      setUploads((current) => current.map((item) => (item.localId === tile.localId ? { ...item, progress: 92 } : item)));
       if (tile.previewUrl) previews.current.set(presign.key, tile.previewUrl);
       await client.register({
         key: presign.key,
-        publicUrl: tile.previewUrl,
+        publicUrl: presign.provider === "stub" ? tile.previewUrl : presign.publicUrl,
         filename: tile.file.name,
         mimeType: contentType,
         size: tile.file.size,
@@ -435,7 +430,10 @@ export function GalleryFoldersLibrary() {
 
   return (
     <div className="media-page media-page--folders">
-      <p className="media-route">/gallery · پوشه‌ها = پیشوند key · دادهٔ آزمایشی</p>
+      <p className="media-route">
+        /gallery · پوشه‌ها = پیشوند key
+        {env.galleryFoldersStub ? " · دادهٔ آزمایشی" : ""}
+      </p>
 
       <div className="folders-mobile-bar">
         <button

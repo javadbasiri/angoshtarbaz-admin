@@ -8,7 +8,7 @@
 - **ANG-A1** — افزودن محصول: فرم کامل، پیش‌نمایش کارت زنده، اعتبارسنجی، اسکلتون، بنر/توست موفقیت، اتصال به API.
 - **ANG-A2** — ویرایش محصول: `GET /products/:id` برای پر کردن فرم، `PATCH` برای ذخیره، اسکلتون / یافت‌نشد / خطا با تلاش مجدد / ذخیره / اعتبارسنجی / بنر موفقیت. قیمت UI تومان است و API ریال (÷۱۰ نمایش، ×۱۰ ذخیره).
 - **ANG-A3** — گالری مرکزی رسانه: صفحه `/gallery`، آپلود presign→PUT→ثبت، چندانتخاب/حذف، و مودال «انتخاب از گالری» روی افزودن/ویرایش محصول (`imageIds[]`).
-- **ANG-A6** — همان `/gallery` با درخت پوشه، وقتی `NEXT_PUBLIC_GALLERY_FOLDERS=1`. پیش‌فرض خاموش است و گالری تخت ANG-A3 را عوض نمی‌کند. داده فعلاً stub درون‌حافظه است و Nest صدا زده نمی‌شود.
+- **ANG-A6** — همان `/gallery` با درخت پوشه، وقتی `NEXT_PUBLIC_GALLERY_FOLDERS=1`. پیش‌فرض خاموش است و گالری تخت ANG-A3 را عوض نمی‌کند. با روشن بودن پرچم، داده از Nest می‌آید؛ `NEXT_PUBLIC_GALLERY_FOLDERS_STUB=1` همان stub درون‌حافظه را برای بازبینی بدون Nest نگه می‌دارد.
 - **ANG-A4** — فهرست محصولات: `/products` (و alias `/admin/products`). سرور Next مستقیماً `GET {NEXT_PUBLIC_API_URL}/products` را با JWT کوکی httpOnly صدا می‌زند. ستون موجودی عمداً نیست.
 - احراز هویت JWT ادمین با کوکی **httpOnly**.
 - خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، دیپلوی.
@@ -189,19 +189,23 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 
 `NEXT_PUBLIC_GALLERY_FOLDERS` پیش‌فرض خاموش است. فقط مقدار `1` یا `true` (بعد از trim) نمای پوشه‌ای ANG-A6 را روشن می‌کند. مقدار خالی یعنی خاموش. این پرچم هم هنگام بیلد inline می‌شود.
 
+`NEXT_PUBLIC_GALLERY_FOLDERS_STUB` همان قاعدهٔ `1` / `true` را دارد و فقط وقتی نمای پوشه روشن است اثر دارد. پیش‌فرض خاموش است: پوشه‌ها مستقیم از Nest خوانده می‌شوند. مقدار `1` stub درون‌حافظه را جایگزین Nest می‌کند تا UI بدون بک‌اند قابل بازبینی باشد. این مقدار هم هنگام بیلد inline می‌شود.
+
 ## Gallery folders (ANG-A6)
 
 پوشه‌ها پیشوند `key` هستند (ریشه `gallery/`). پوشهٔ خالی یک آبجکت صفر-بایتی `{prefix}.keep` است و در گرید فایل‌ها نشان داده نمی‌شود. آپلود همیشه به پوشهٔ فعلی می‌رود. در ریشهٔ بدون پوشه، دکمهٔ اصلی «پوشه جدید» است و آپلود کم‌رنگ است (مسدود نیست).
 
-تا وقتی آداپتر Nest در PR بعدی وصل شود، با روشن بودن پرچم هیچ درخواست پوشه‌ای به بک‌اند نمی‌رود. رابط `GalleryFoldersClient` همان مسیرهای تأییدشده را مدل می‌کند:
+با روشن بودن `NEXT_PUBLIC_GALLERY_FOLDERS` و خاموش بودن stub، `GalleryFoldersClient` همین مسیرها را با Server Action و JWT کوکی صدا می‌زند (Route Handler جدید نیست). مرورگر فقط بایت‌ها را به `uploadUrl` حاصل از presign می‌فرستد و سپس ثبت فعلی `POST /gallery` انجام می‌شود. کدهای `FOLDER_EXISTS` و `FOLDER_NOT_EMPTY` به همان متن‌های فارسی دیالوگ‌ها نگاشت می‌شوند.
 
-| عمل | Nest (بعداً) |
+| عمل | Nest |
 | --- | --- |
 | فهرست یک سطح | `GET /gallery/browse?prefix=&delimiter=/` |
-| ساخت پوشه | `POST /gallery/folders` `{ parentPrefix, name }` |
+| درخت (اختیاری) | `GET /gallery/tree` — اگر نباشد یا بدنه شناخته نشود، درخت از browse ساخته می‌شود |
+| ساخت پوشه | `POST /gallery/folders` `{ parentPrefix, name }` — `409` `FOLDER_EXISTS` «پوشه‌ای با این نام وجود دارد» |
 | تغییر نام | `POST /gallery/folders/rename` `{ fromPrefix, toName }` یا `toPrefix` |
-| حذف پوشه خالی | `DELETE /gallery/folders?prefix=` — اگر پر باشد `409` با `FOLDER_NOT_EMPTY` و `objectCount` |
+| حذف پوشه خالی | `DELETE /gallery/folders?prefix=` — `204` خالی؛ اگر پر باشد `409` `FOLDER_NOT_EMPTY` و `objectCount` با پیام «پوشه خالی نیست؛ ابتدا فایل‌ها را جابه‌جا یا حذف کنید» |
 | جابه‌جایی | `POST /gallery/objects/move` `{ keys, destinationPrefix, onConflict }` و `onConflict` یکی از `replace` \| `autoRename` \| `skip` |
+| حذف چند فایل | `DELETE /gallery/objects` `{ keys }` |
 | Presign داخل پوشه | `POST /gallery/presign` با `{ filename, mime, size, prefix }` — کلید = پیشوند + نام پاک‌شده |
 
-`GET /gallery` صفحه‌بندی‌شده برای حالت خاموش پرچم سر جایش می‌ماند. Route Handler جدید ساخته نشده. ناوبری پوشه با query `?prefix=` است؛ اگر نباشد، پوشهٔ نمونه `gallery/rings/red/` باز می‌شود.
+`GET /gallery` صفحه‌بندی‌شده برای حالت خاموش پرچم سر جایش می‌ماند و بدنهٔ presign تخت همان `{ filename, mime, size }` است. ناوبری پوشه با query `?prefix=` است. بدون query، Nest ریشهٔ `gallery/` را باز می‌کند؛ stub نمونهٔ `gallery/rings/red/` را باز می‌کند.
