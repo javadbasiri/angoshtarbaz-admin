@@ -18,35 +18,52 @@
 - `lang="fa"` / `dir="rtl"` + [Vazirmatn](https://fonts.google.com/specimen/Vazirmatn)
 - برند: Primary `#541926` · Strong `#3F121C` · Secondary `#E0E0E0` · Canvas `#F8F4EC` · Surface `#FFFFFF` · Ink `#1C1917` · Muted `#78716C` · Border `#E7E0D4`
 
-## Setup
+## راه‌اندازی محلی
+
+NestJS ([angoshtarbaz-backend](https://github.com/javadbasiri/angoshtarbaz-backend)) روی پورت **3000** گوش می‌دهد (`PORT || 3000`، بدون پیشوند سراسری). پنل ادمین روی **3001** اجرا می‌شود تا با Nest تداخل نداشته باشد. این همان پیش‌فرض `ADMIN_ORIGIN` بک‌اند است (`http://localhost:3001`).
+
+`NEXT_PUBLIC_API_URL` الزامی است و هنگام بیلد داخل باندل inline می‌شود. بعد از تغییر آن، `next dev` را ری‌استارت کنید یا دوباره `npm run build` بگیرید.
 
 ```bash
-npm i
-cp .env.example .env.local
-npm run dev
+# مخزن بک‌اند
+npm run start:dev
+# http://localhost:3000
 ```
 
-ادمین: [http://localhost:3000](http://localhost:3000)
+```bash
+# همین مخزن
+npm i
+cp .env.example .env.local
+# NEXT_PUBLIC_API_URL=http://localhost:3000
+npm run dev
+# http://localhost:3001
+```
 
-بک‌اند باید روی پورت پیش‌فرض `3001` باشد (`NEXT_PUBLIC_API_URL`). اگر [angoshtarbaz-backend](https://github.com/javadbasiri/angoshtarbaz-backend) (ایجاد/ویرایش محصول + گالری PR #4) در دسترس نیست، API ساختگی محلی را اجرا کنید:
+ورود نمونه: `admin@angoshtarbaz.local` / `admin123456`
+
+اگر ردیف ادمین از قبل در پایگاه وجود داشته باشد، سید رمز را بازنشانی نمی‌کند. در آن صورت با همان رمز قبلی وارد شوید، یا ردیف را در دیتابیس اصلاح کنید.
+
+### API ساختگی
+
+اگر بک‌اند در دسترس نیست، API ساختگی را روی پورت **3002** اجرا کنید و ادمین را به آن وصل کنید:
 
 ```bash
 npm run mock-api
-# http://localhost:3001  — login / collections / products / gallery
+# http://localhost:3002  — login / collections / products / gallery
 # نمونه: GET /products/prd_solitaire_01
 ```
 
-سپس در ترمینال دیگر `npm run dev`.
+در `.env.local`:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:3002
+```
+
+سپس dev server را ری‌استارت کنید (مقدار هنگام بیلد ثابت می‌شود). پورت mock با `MOCK_API_PORT` قابل تغییر است.
 
 ### CORS
 
-بک‌اند `ADMIN_ORIGIN` را پیش‌فرض `http://localhost:3001` می‌گذارد. این پنل روی **۳۰۰۰** اجرا می‌شود؛ برای توسعه محلی یکی از این‌ها را روی بک‌اند ست کنید:
-
-```bash
-ADMIN_ORIGIN=http://localhost:3000
-```
-
-یا در محیط محلی بدون env، بک‌اند Origin را reflect می‌کند.
+بک‌اند `ADMIN_ORIGIN` را پیش‌فرض `http://localhost:3001` می‌گذارد و پنل هم روی همین مبدأ اجرا می‌شود. اگر پورت ادمین را عوض کردید، `ADMIN_ORIGIN` بک‌اند را با آن یکی کنید. در محیط محلی بدون env، بک‌اند Origin را reflect می‌کند.
 
 ## Seed
 
@@ -57,6 +74,8 @@ ADMIN_ORIGIN=http://localhost:3000
 | نقش | `admin` (JWT) |
 
 ورود از `/login` یک Server Action است که `POST {API}/auth/login` را صدا می‌زند و توکن را در کوکی httpOnly `angoshtarbaz_admin_session` ذخیره می‌کند. مسیرهای ادمین بدون نشست به `/login` می‌روند. پاسخ ۴۰۱ از بک‌اند همان کوکی را پاک می‌کند و به `/login` برمی‌گرداند.
+
+اگر کاربر ادمین از قبل در دیتابیس بوده، اجرای دوبارهٔ سید رمز `admin123456` را بازنشانی نمی‌کند.
 
 ## Routes
 
@@ -156,13 +175,13 @@ ADMIN_ORIGIN=http://localhost:3000
 | Command | |
 | --- | --- |
 | `npm i` | نصب وابستگی‌ها |
-| `npm run dev` | Next.js روی :3000 |
-| `npm run mock-api` | API ساختگی روی :3001 |
+| `npm run dev` | Next.js روی :3001 |
+| `npm run mock-api` | API ساختگی روی :3002 (`MOCK_API_PORT`) |
 | `npm run build` | بیلد پروداکشن |
-| `npm run start` | سرو بیلد |
+| `npm run start` | سرو بیلد روی :3001 |
 | `npm run lint` | ESLint |
-| `npm test` | تست واحد قیمت، query فهرست، نام هدر، و مقصد آپلود گالری |
+| `npm test` | تست واحد قیمت، query فهرست، نام هدر، مقصد آپلود گالری، و استخراج توکن ورود |
 
 ## Env
 
-`NEXT_PUBLIC_API_URL` (پیش‌فرض `http://localhost:3001`) را در `.env.local` بگذارید. جزئیات در `.env.example`.
+`NEXT_PUBLIC_API_URL` الزامی است (پیش‌فرض کد `http://localhost:3000`، یعنی Nest). برای mock: `http://localhost:3002`. مقدار هنگام بیلد inline می‌شود؛ جزئیات در `.env.example`.

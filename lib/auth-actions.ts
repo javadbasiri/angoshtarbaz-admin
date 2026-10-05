@@ -1,5 +1,7 @@
 "use server";
 
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { actionFail, actionOk, type ActionResult } from "@/lib/action-result";
 import {
   backendFetch,
@@ -9,9 +11,18 @@ import {
   messageFromBody,
 } from "@/lib/backend";
 import { AUTH_LOGIN_PATH, env } from "@/lib/env";
+import { loginFailureMessage, unreachableBackendMessage } from "@/lib/login-response";
 import { clearSessionCookie, setSessionCookie } from "@/lib/session-cookie";
 import type { AdminUser } from "@/types/auth";
-import { redirect } from "next/navigation";
+
+async function callerOrigin(): Promise<string | null> {
+  const headerList = await headers();
+  const host =
+    headerList.get("x-forwarded-host")?.split(",")[0]?.trim() || headerList.get("host");
+  if (!host) return null;
+  const forwarded = headerList.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return `${forwarded || "http"}://${host}`;
+}
 
 export async function loginAction(input: {
   email: string;
@@ -23,19 +34,36 @@ export async function loginAction(input: {
     return actionFail(400, "ایمیل و رمز عبور الزامی است.");
   }
 
+  const url = `${env.apiUrl}${AUTH_LOGIN_PATH}`;
+  const adminOrigin = await callerOrigin();
+
   try {
     const { response, body } = await backendFetch(AUTH_LOGIN_PATH, {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
 
+    const failure = loginFailureMessage({
+      ok: response.ok,
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      url,
+      body,
+      apiOrigin: env.apiUrl,
+      adminOrigin,
+      password,
+    });
+
     if (!response.ok) {
-      return actionFail(response.status || 401, messageFromBody(body, "ورود ناموفق بود."));
+      return actionFail(
+        response.status || 401,
+        failure ?? messageFromBody(body, "ورود ناموفق بود."),
+      );
     }
 
     const token = extractToken(body);
     if (!token) {
-      return actionFail(502, "پاسخ ورود توکن JWT ندارد.");
+      return actionFail(502, failure ?? "پاسخ ورود توکن JWT ندارد.");
     }
 
     const user = extractUser(body, email) ?? { email, role: "admin" };
@@ -46,7 +74,7 @@ export async function loginAction(input: {
     await setSessionCookie(token);
     return actionOk(user);
   } catch {
-    return actionFail(502, `بک‌اند در ${env.apiUrl} در دسترس نیست.`);
+    return actionFail(502, unreachableBackendMessage(url));
   }
 }
 
