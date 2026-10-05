@@ -5,7 +5,9 @@ import { expireAdminSession } from "@/lib/expire-session";
 
 export function ExpireSession() {
   useEffect(() => {
-    void expireAdminSession();
+    void expireAdminSession().finally(() => {
+      window.location.replace("/login");
+    });
   }, []);
   return null;
 }

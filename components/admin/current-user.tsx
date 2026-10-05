@@ -16,7 +16,9 @@ export function CurrentUserProvider({
 }) {
   useEffect(() => {
     function onExpired() {
-      void expireAdminSession();
+      void expireAdminSession().finally(() => {
+        window.location.replace("/login");
+      });
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
