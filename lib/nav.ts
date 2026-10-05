@@ -33,7 +33,7 @@ export function navItemIsActive(item: AdminNavItem, pathname: string): boolean {
 
 export const ADMIN_NAV: AdminNavItem[] = [
   {
-    href: "/products/new",
+    href: "/products",
     label: "محصولات",
     icon: "products",
     section: "store",

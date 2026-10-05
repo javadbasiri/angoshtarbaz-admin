@@ -79,7 +79,7 @@ export function ProductEditor({
   }, [productId, reloadToken]);
 
   const breadcrumb = useMemo((): AdminBreadcrumbItem[] => {
-    const items: AdminBreadcrumbItem[] = [{ href: "/", label: "محصولات" }];
+    const items: AdminBreadcrumbItem[] = [{ href: "/products", label: "محصولات" }];
     if (load.status === "ready") {
       const collectionName =
         load.collections.find((item) => item.id === load.product.collectionId)?.name ||
