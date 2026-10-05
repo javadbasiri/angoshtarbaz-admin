@@ -3,6 +3,24 @@ import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, SESSION_MAX_AGE_SECONDS } from "@/lib/auth-constants";
 import { backendFetch, extractToken, extractUser, isAdminRole } from "@/lib/backend";
 import { env } from "@/lib/env";
+import { loginFailureMessage, unreachableBackendMessage } from "@/lib/login-response";
+
+function adminOrigin(request: Request): string | null {
+  const host =
+    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    request.headers.get("host");
+  if (!host) return null;
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  let proto = forwarded;
+  if (!proto) {
+    try {
+      proto = new URL(request.url).protocol.replace(":", "");
+    } catch {
+      proto = "http";
+    }
+  }
+  return `${proto}://${host}`;
+}
 
 const LOGIN_PATHS = Array.from(
   new Set([env.loginPath, "/auth/login", "/auth/signin", "/login", "/auth/admin/login"]),
@@ -25,7 +43,10 @@ export async function POST(request: Request) {
   let lastStatus = 502;
   let lastBody: unknown = { message: "اتصال به بک‌اند برقرار نشد." };
 
+  const callerOrigin = adminOrigin(request);
+
   for (const path of LOGIN_PATHS) {
+    const url = `${env.apiUrl}${path}`;
     try {
       const { response, body } = await backendFetch(path, {
         method: "POST",
@@ -34,7 +55,21 @@ export async function POST(request: Request) {
       lastStatus = response.status;
       lastBody = body;
 
+      const failure = loginFailureMessage({
+        ok: response.ok,
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        url,
+        body,
+        apiOrigin: env.apiUrl,
+        adminOrigin: callerOrigin,
+        password,
+      });
+
       if (!response.ok) {
+        if (failure) {
+          lastBody = { message: failure };
+        }
         if (response.status === 404) continue;
         break;
       }
@@ -42,7 +77,9 @@ export async function POST(request: Request) {
       const token = extractToken(body);
       if (!token) {
         lastStatus = 502;
-        lastBody = { message: "پاسخ ورود توکن JWT ندارد." };
+        lastBody = {
+          message: failure ?? "پاسخ ورود توکن JWT ندارد.",
+        };
         continue;
       }
 
@@ -70,7 +107,7 @@ export async function POST(request: Request) {
     } catch {
       lastStatus = 502;
       lastBody = {
-        message: `بک‌اند در ${env.apiUrl} در دسترس نیست.`,
+        message: unreachableBackendMessage(url),
       };
     }
   }

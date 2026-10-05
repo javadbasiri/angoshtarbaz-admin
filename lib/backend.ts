@@ -7,6 +7,8 @@ import type { CollectionOption } from "@/types/collection";
 import { extractProduct } from "@/lib/product-map";
 import type { CreatedProduct } from "@/types/product";
 
+export { extractToken } from "@/lib/login-response";
+
 async function readBody(response: Response): Promise<unknown> {
   if (response.status === 204) return undefined;
   const text = await response.text();
@@ -86,21 +88,6 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-}
-
-export function extractToken(body: unknown): string | null {
-  const root = asRecord(body);
-  if (!root) return null;
-  const nested = asRecord(root.data) ?? asRecord(root.result) ?? root;
-  const bags = [nested, root, asRecord(nested.tokens), asRecord(root.tokens)];
-
-  for (const bag of bags) {
-    if (!bag) continue;
-    for (const key of ["accessToken", "access_token", "token", "jwt", "idToken"]) {
-      if (typeof bag[key] === "string" && bag[key]) return bag[key] as string;
-    }
-  }
-  return null;
 }
 
 export function extractUser(body: unknown, emailFallback?: string): AdminUser | null {

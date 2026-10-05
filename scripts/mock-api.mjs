@@ -4,12 +4,13 @@
  * (presign → PUT upload → register → list/delete + public file serve).
  *
  *   node scripts/mock-api.mjs
- *   # listens on http://localhost:3001
+ *   # listens on http://localhost:3002
+ *   # then run the admin with NEXT_PUBLIC_API_URL=http://localhost:3002
  */
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 
-const PORT = Number(process.env.MOCK_API_PORT || 3001);
+const PORT = Number(process.env.MOCK_API_PORT || 3002);
 const SEED_EMAIL = "admin@angoshtarbaz.local";
 const SEED_PASSWORD = "admin123456";
 
@@ -128,7 +129,7 @@ function mergeProduct(existing, payload) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const origin = req.headers.origin || "http://localhost:3000";
+  const origin = req.headers.origin || "http://localhost:3001";
   const url = new URL(req.url || "/", `http://127.0.0.1:${PORT}`);
 
   if (req.method === "OPTIONS") {

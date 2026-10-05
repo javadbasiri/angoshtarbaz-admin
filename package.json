@@ -4,11 +4,12 @@
   "private": true,
   "description": "انگشترباز admin panel (Next.js App Router)",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "mock-api": "node scripts/mock-api.mjs",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start -p 3001",
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --test lib/login-response.test.ts"
   },
   "dependencies": {
     "next": "16.3.5",
