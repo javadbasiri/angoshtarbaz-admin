@@ -3,9 +3,9 @@
 import { actionFail, actionOk, type ActionResult } from "@/lib/action-result";
 import { adminCallToResult, callAdminBackend } from "@/lib/admin-call";
 import { env } from "@/lib/env";
-import { extractGalleryAsset, extractGalleryList, extractPresign, registerPayload } from "@/lib/gallery";
+import { extractGalleryAsset, extractGalleryList, extractPresign, presignPayload, registerPayload } from "@/lib/gallery";
 import { browserUploadTarget } from "@/lib/gallery-upload-target";
-import type { GalleryAsset, GalleryKind, GalleryListMeta, GalleryPresign, GalleryRegisterInput } from "@/types/gallery";
+import type { GalleryAsset, GalleryListMeta, GalleryPresign, GalleryRegisterInput } from "@/types/gallery";
 
 export async function listGalleryAction(
   limit = 100,
@@ -19,11 +19,10 @@ export async function presignGalleryAction(input: {
   filename: string;
   contentType: string;
   size: number;
-  kind: GalleryKind;
 }): Promise<ActionResult<GalleryPresign>> {
   const call = await callAdminBackend("/gallery/presign", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify(presignPayload(input)),
   });
   return adminCallToResult(
     call,

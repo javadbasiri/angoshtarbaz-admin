@@ -30,11 +30,11 @@ export type GalleryPresign = {
   provider?: string;
 };
 
+/** Client-side register input. Mapped to the Nest body in `registerPayload`. */
 export type GalleryRegisterInput = {
   key: string;
   publicUrl: string;
   filename: string;
   mimeType: string;
   size: number;
-  kind: GalleryKind;
 };

@@ -59,7 +59,6 @@ export async function uploadFileToGallery(
       filename: file.name,
       contentType,
       size: file.size,
-      kind: allowed.kind,
     }),
   );
 
@@ -76,7 +75,6 @@ export async function uploadFileToGallery(
       filename: file.name,
       mimeType: contentType,
       size: file.size,
-      kind: allowed.kind,
     }),
   );
   onProgress?.(100);

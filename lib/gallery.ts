@@ -1,4 +1,4 @@
-import { toPersianDigits } from "@/lib/format";
+import { toPersianDigits } from "./format.ts";
 import type {
   GalleryAsset,
   GalleryKind,
@@ -118,7 +118,11 @@ export function extractGalleryAsset(value: unknown): GalleryAsset | null {
     asString(data.key) ??
     id;
   const mimeType =
-    asString(data.mimeType) ?? asString(data.contentType) ?? asString(data.type) ?? "application/octet-stream";
+    asString(data.mime) ??
+    asString(data.mimeType) ??
+    asString(data.contentType) ??
+    asString(data.type) ??
+    "application/octet-stream";
   const publicUrl =
     asString(data.publicUrl) ??
     asString(data.url) ??
@@ -194,16 +198,32 @@ export function extractPresign(body: unknown): GalleryPresign | null {
   };
 }
 
-export function registerPayload(input: GalleryRegisterInput): Record<string, unknown> {
+/** Nest `POST /gallery/presign` body. `kind` stays client-side and is omitted. */
+export function presignPayload(input: {
+  filename: string;
+  contentType: string;
+  size: number;
+}): { filename: string; mime: string; size: number } {
   return {
-    key: input.key,
-    publicUrl: input.publicUrl,
-    url: input.publicUrl,
     filename: input.filename,
-    originalName: input.filename,
-    mimeType: input.mimeType,
-    contentType: input.mimeType,
+    mime: input.contentType,
     size: input.size,
-    kind: input.kind,
+  };
+}
+
+/** Nest `POST /gallery` body. `url` is the presign `publicUrl`. */
+export function registerPayload(input: GalleryRegisterInput): {
+  url: string;
+  key: string;
+  mime: string;
+  size: number;
+  originalName: string;
+} {
+  return {
+    url: input.publicUrl,
+    key: input.key,
+    mime: input.mimeType,
+    size: input.size,
+    originalName: input.filename,
   };
 }
