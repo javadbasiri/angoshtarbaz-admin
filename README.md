@@ -22,7 +22,7 @@
 
 NestJS ([angoshtarbaz-backend](https://github.com/javadbasiri/angoshtarbaz-backend)) روی پورت **3000** گوش می‌دهد (`PORT || 3000`، بدون پیشوند سراسری). پنل ادمین روی **3001** اجرا می‌شود تا با Nest تداخل نداشته باشد. این همان پیش‌فرض `ADMIN_ORIGIN` بک‌اند است (`http://localhost:3001`).
 
-`NEXT_PUBLIC_API_URL` الزامی است و هنگام بیلد داخل باندل inline می‌شود. بعد از تغییر آن، `next dev` را ری‌استارت کنید یا دوباره `npm run build` بگیرید.
+`NEXT_PUBLIC_API_URL` باید مبدأ Nest باشد (`http://localhost:3000`) و هنگام بیلد داخل باندل inline می‌شود. مقدار خالی یا فقط فاصله نادیده گرفته می‌شود و به پیش‌فرض (`http://localhost:3000`) برمی‌گردد. بعد از تغییر آن، `next dev` را ری‌استارت کنید یا دوباره `npm run build` بگیرید.
 
 ```bash
 # مخزن بک‌اند
@@ -184,4 +184,4 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 
 ## Env
 
-`NEXT_PUBLIC_API_URL` الزامی است (پیش‌فرض کد `http://localhost:3000`، یعنی Nest). برای mock: `http://localhost:3002`. مقدار هنگام بیلد inline می‌شود؛ جزئیات در `.env.example`.
+`NEXT_PUBLIC_API_URL` باید مبدأ Nest باشد (`http://localhost:3000`). ادمین روی ۳۰۰۱ و API ساختگی روی ۳۰۰۲ است. مقدار خالی یا فقط فاصله به پیش‌فرض برمی‌گردد و هنگام بیلد inline می‌شود. برای mock: `http://localhost:3002`. جزئیات در `.env.example`.
