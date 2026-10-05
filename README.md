@@ -56,7 +56,7 @@ ADMIN_ORIGIN=http://localhost:3000
 | رمز | `admin123456` |
 | نقش | `admin` (JWT) |
 
-ورود از `/login` به `POST {API}/auth/login` پروکسی می‌شود و توکن در کوکی httpOnly `angoshtarbaz_admin_session` ذخیره می‌گردد. مسیرهای ادمین بدون نشست به `/login` می‌روند.
+ورود از `/login` یک Server Action است که `POST {API}/auth/login` را صدا می‌زند و توکن را در کوکی httpOnly `angoshtarbaz_admin_session` ذخیره می‌کند. مسیرهای ادمین بدون نشست به `/login` می‌روند. پاسخ ۴۰۱ از بک‌اند همان کوکی را پاک می‌کند و به `/login` برمی‌گرداند.
 
 ## Routes
 
@@ -75,27 +75,24 @@ ADMIN_ORIGIN=http://localhost:3000
 
 ## API mapping
 
-ورود، افزودن/ویرایش محصول و گالری هنوز از BFF همین اپ (`/api/*`) می‌گذرند و JWT را با `Authorization: Bearer` به بک‌اند می‌فرستند.
+ادمین Route Handler ندارد. همهٔ فراخوانی‌ها از سرور Next (صفحه یا Server Action) با `Authorization: Bearer` و JWT کوکی httpOnly به `{NEXT_PUBLIC_API_URL}` می‌روند. توکن به جاوااسکریپت مرورگر داده نمی‌شود.
 
-**فهرست محصولات (ANG-A4) از Route Handler استفاده نمی‌کند.** صفحهٔ سروری کوکی httpOnly را می‌خواند و مستقیماً `GET {NEXT_PUBLIC_API_URL}/products?status=&search=&page=&limit=` را صدا می‌زند. `GET /api/products` وجود ندارد (فقط `POST` برای ایجاد محصول مانده است).
-
-| Admin UI | BFF | Backend |
+| Admin UI | فراخوانی سرور | Backend |
 | --- | --- | --- |
-| ورود | `POST /api/auth/login` | `POST /auth/login` (fallback: `/auth/signin`, `/login`) |
-| خروج | `POST /api/auth/logout` | پاک کردن کوکی |
-| نشست | `GET /api/auth/me` | `GET /auth/me` |
-| کالکشن‌ها | `GET /api/collections` | `GET /collections` — اگر نبود، سولیتر / وینتیج / طلای سفید |
-| فهرست محصولات | — (فراخوانی مستقیم سرور) | `GET /products?status=&search=&page=&limit=` |
-| ایجاد محصول | `POST /api/products` | `POST /products` سپس `GET /products/:id` |
-| خواندن محصول | `GET /api/products/:id` | `GET /products/:id` — عمومی روی بک‌اند (شامل پیش‌نویس)؛ BFF همچنان نشست ادمین می‌خواهد |
-| ویرایش محصول | `PATCH /api/products/:id` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری؛ همان شکل ایجاد |
-| فهرست گالری | `GET /api/gallery` | `GET /gallery` — `{ data, meta }` |
-| Presign آپلود | `POST /api/gallery/presign` | `POST /gallery/presign` → `{ uploadUrl, headers, key, publicUrl, provider }` |
-| آپلود بایت | `PUT /api/gallery/upload/:key` | `PUT /gallery/upload/:key` (mock) یا URL امضاشده S3 |
-| ثبت فایل | `POST /api/gallery` | `POST /gallery` — بعد از آپلود؛ `id` برای `imageIds[]` |
-| حذف فایل | `DELETE /api/gallery/:id` | `DELETE /gallery/:id` |
-| فایل عمومی (mock) | — | `GET /gallery/files/:key` |
-| آپلود قدیمی | `POST /api/uploads` | `POST /uploads` — سازگاری؛ جریان اصلی گالری است |
+| ورود | `loginAction` | `POST /auth/login` |
+| خروج | `logoutAction` | پاک کردن کوکی؛ بدون درخواست بک‌اند |
+| کاربر فعلی | `loadCurrentUser` در لایهٔ `(shell)` | `GET /auth/profile` — `{ id, email, firstName, lastName, role }` |
+| کالکشن‌ها | `loadCollectionsAction` | `GET /collections` — اگر خالی یا قطع بود، سولیتر / وینتیج / طلای سفید |
+| فهرست محصولات | صفحهٔ سروری | `GET /products?status=&search=&page=&limit=` |
+| ایجاد محصول | `createProductAction` سپس `getProductAction` | `POST /products` سپس `GET /products/:id` |
+| خواندن محصول | `loadProductForEdit` / `getProductAction` | `GET /products/:id` — عمومی روی بک‌اند (شامل پیش‌نویس)؛ ادمین همچنان نشست می‌خواهد |
+| ویرایش محصول | `updateProductAction` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری |
+| فهرست گالری | `listGalleryAction` | `GET /gallery` — `{ data, meta }` |
+| Presign آپلود | `presignGalleryAction` | `POST /gallery/presign` |
+| آپلود بایت | مرورگر، مستقیم به `uploadUrl` | `PUT` با هدرهای presign و بدون JWT. mock: `?token=` روی خود API. s3: URL امضاشده |
+| ثبت فایل | `registerGalleryAction` | `POST /gallery` — `id` برای `imageIds[]` |
+| حذف فایل | `deleteGalleryAction` | `DELETE /gallery/:id` |
+| فایل عمومی (mock) | مرورگر، مستقیم | `GET /gallery/files/:key` |
 
 ### `POST /products` body
 
@@ -132,11 +129,9 @@ ADMIN_ORIGIN=http://localhost:3000
 
 ## Gallery upload (ANG-A3)
 
-آپلود از مرورگر مستقیم به S3 نمی‌رود مگر `uploadUrl` امضاشده باشد. جریان:
-
-1. `POST /api/gallery/presign` با `{ filename, contentType, size }`
-2. `PUT` بایت فایل به `uploadUrl` (برای mock، BFF آن را به `/api/gallery/upload/:key` بازنویسی می‌کند تا JWT httpOnly همراه شود)
-3. `POST /api/gallery` برای ثبت متادیتا و گرفتن `id`
+1. Server Action: `POST /gallery/presign` با `{ filename, contentType, size, kind }` و JWT ادمین
+2. مرورگر `PUT` بایت را مستقیم به `uploadUrl` می‌فرستد، با هدرهای presign و بدون `Authorization`. برای `provider: "mock"` آدرس روی خود API است و `?token=` احراز هویت است. برای `provider: "s3"` آدرس امضاشدهٔ باکت است.
+3. Server Action: `POST /gallery` برای ثبت و گرفتن `id`
 4. تازه‌سازی گرید / پیوست به محصول با `imageIds[]`
 
 قالب مجاز: JPG / PNG / WebP تا ۱۲ مگابایت و MP4 تا ۵۰ مگابایت. اگر بک‌اند در دسترس نباشد صفحه گالری و مودال انتخاب خطا را نشان می‌دهند.
@@ -166,7 +161,7 @@ ADMIN_ORIGIN=http://localhost:3000
 | `npm run build` | بیلد پروداکشن |
 | `npm run start` | سرو بیلد |
 | `npm run lint` | ESLint |
-| `npm test` | تست واحد قیمت و نگاشت query فهرست |
+| `npm test` | تست واحد قیمت، query فهرست، نام هدر، و مقصد آپلود گالری |
 
 ## Env
 

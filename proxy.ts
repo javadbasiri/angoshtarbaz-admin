@@ -5,9 +5,7 @@ import { ADMIN_SESSION_COOKIE } from "@/lib/auth-constants";
 const PUBLIC_PATHS = new Set(["/login"]);
 
 function isPublic(pathname: string) {
-  if (PUBLIC_PATHS.has(pathname)) return true;
-  if (pathname.startsWith("/api/")) return true;
-  return false;
+  return PUBLIC_PATHS.has(pathname);
 }
 
 export function proxy(request: NextRequest) {

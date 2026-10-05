@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertIcon, CheckIcon, GalleryIcon, PlusIcon, TrashIcon, UploadIcon } from "@/components/admin/icons";
 import { MediaThumb } from "@/components/gallery/media-thumb";
-import { apiFetch, ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api";
+import { unwrapAction } from "@/lib/call-action";
+import { deleteGalleryAction, listGalleryAction } from "@/lib/gallery-actions";
+import { rethrowNextRedirect } from "@/lib/redirect-error";
 import { formatFileSize, formatGalleryCount, isAllowedGalleryFile } from "@/lib/gallery";
 import { uploadFileToGallery } from "@/lib/gallery-upload";
 import { toPersianDigits } from "@/lib/format";
@@ -23,13 +26,6 @@ function newLocalId() {
   return `up-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function extractList(payload: unknown): GalleryAsset[] {
-  if (payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown }).items)) {
-    return (payload as { items: GalleryAsset[] }).items;
-  }
-  return [];
-}
-
 export function GalleryLibrary() {
   const [items, setItems] = useState<GalleryAsset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,9 +42,11 @@ export function GalleryLibrary() {
   const loadGallery = useCallback(async () => {
     setLoadError(null);
     try {
-      const payload = await apiFetch<unknown>({ path: "/api/gallery?limit=100" });
-      setItems(extractList(payload));
+      const listed = await unwrapAction(await listGalleryAction(100));
+      setItems(listed.items);
     } catch (error) {
+      rethrowNextRedirect(error);
+      if (error instanceof ApiError && error.status === 401) return;
       setLoadError(error instanceof ApiError ? error.message : "اتصال به سرور برقرار نشد.");
     } finally {
       setLoading(false);
@@ -113,8 +111,10 @@ export function GalleryLibrary() {
     const remaining: string[] = [];
     for (const id of ids) {
       try {
-        await apiFetch({ path: `/api/gallery/${encodeURIComponent(id)}`, method: "DELETE" });
-      } catch {
+        await unwrapAction(await deleteGalleryAction(id));
+      } catch (error) {
+        rethrowNextRedirect(error);
+        if (error instanceof ApiError && error.status === 401) return;
         remaining.push(id);
       }
     }
@@ -145,6 +145,8 @@ export function GalleryLibrary() {
       URL.revokeObjectURL(tile.previewUrl);
       setItems((current) => [asset, ...current.filter((item) => item.id !== asset.id)]);
     } catch (error) {
+      rethrowNextRedirect(error);
+      if (error instanceof ApiError && error.status === 401) return;
       setUploads((current) =>
         current.map((item) =>
           item.localId === tile.localId

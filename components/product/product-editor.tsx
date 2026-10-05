@@ -8,18 +8,14 @@ import type { AdminBreadcrumbItem } from "@/components/admin/header";
 import { ProductFormFields } from "@/components/product/product-form-fields";
 import { ProductFormSkeleton } from "@/components/product/product-skeleton";
 import { useProductForm } from "@/components/product/use-product-form";
-import { apiFetch, ApiError } from "@/lib/api";
-import { extractProduct, productToFormValues, withProductCollection } from "@/lib/product-map";
+import { ApiError } from "@/lib/api";
+import { loadCollectionsAction } from "@/lib/collection-actions";
+import { getProductAction, updateProductAction } from "@/lib/product-actions";
+import { productToFormValues, withProductCollection } from "@/lib/product-map";
+import { rethrowNextRedirect } from "@/lib/redirect-error";
+import { signalSessionExpired } from "@/lib/session-expired";
 import { FALLBACK_COLLECTIONS, type CollectionOption } from "@/types/collection";
 import type { ProductEditLoadState, ProductRecord, ProductStatus } from "@/types/product";
-
-function parseCollections(payload: unknown): CollectionOption[] {
-  if (Array.isArray(payload)) return payload as CollectionOption[];
-  if (payload && typeof payload === "object" && Array.isArray((payload as { collections?: unknown }).collections)) {
-    return (payload as { collections: CollectionOption[] }).collections;
-  }
-  return [];
-}
 
 function editRoute(productId: string) {
   return `/admin/products/${productId}/edit`;
@@ -41,30 +37,37 @@ export function ProductEditor({
 
     async function loadProduct() {
       try {
-        const [productPayload, collectionsPayload] = await Promise.all([
-          apiFetch<unknown>({ path: `/api/products/${encodeURIComponent(productId)}` }),
-          apiFetch<unknown>({ path: "/api/collections" }).catch(() => FALLBACK_COLLECTIONS),
-        ]);
+        const productResult = await getProductAction(productId);
         if (cancelled) return;
-
-        const product = extractProduct(productPayload);
-        if (!product) {
-          setLoad({ status: "error", message: "پاسخ محصول ناقص است." });
+        if (!productResult.ok) {
+          if (productResult.status === 401) {
+            signalSessionExpired();
+            return;
+          }
+          if (productResult.status === 404) {
+            setLoad({ status: "not-found" });
+            return;
+          }
+          setLoad({ status: "error", message: productResult.message });
           return;
         }
 
-        const list = parseCollections(collectionsPayload);
+        const collectionsResult = await loadCollectionsAction();
+        if (cancelled) return;
+        if (!collectionsResult.ok && collectionsResult.status === 401) {
+          signalSessionExpired();
+          return;
+        }
+
+        const list = collectionsResult.ok ? collectionsResult.data : FALLBACK_COLLECTIONS;
         const collections = withProductCollection(
           list.length ? list : FALLBACK_COLLECTIONS,
-          product,
+          productResult.data,
         );
-        setLoad({ status: "ready", product, collections });
+        setLoad({ status: "ready", product: productResult.data, collections });
       } catch (error) {
+        rethrowNextRedirect(error);
         if (cancelled) return;
-        if (error instanceof ApiError && error.status === 404) {
-          setLoad({ status: "not-found" });
-          return;
-        }
         setLoad({
           status: "error",
           message: error instanceof ApiError ? error.message : "اتصال به سرور برقرار نشد.",
@@ -191,13 +194,15 @@ function ProductEditForm({
       const payload = await form.buildPayload(status);
       if (!payload) return;
 
-      const updated = await apiFetch<unknown>({
-        path: `/api/products/${encodeURIComponent(productId)}`,
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-      const next = extractProduct(updated);
-      const productName = next?.name || form.values.name;
+      const updated = await updateProductAction(productId, payload);
+      if (!updated.ok) {
+        if (updated.status === 401) {
+          signalSessionExpired();
+          return;
+        }
+        throw new ApiError(updated.message, updated.status);
+      }
+      const productName = updated.data.name || form.values.name;
       form.patch({ status });
       if (status === "published") {
         form.setAlert({
@@ -214,6 +219,8 @@ function ProductEditForm({
       }
       form.setToast("ذخیره انجام شد");
     } catch (error) {
+      rethrowNextRedirect(error);
+      if (error instanceof ApiError && error.status === 401) return;
       form.setAlert({
         kind: "error",
         title: "ذخیره محصول انجام نشد",

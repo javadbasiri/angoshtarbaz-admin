@@ -18,7 +18,6 @@ function messageFrom(body: unknown, fallback: string): string {
 /**
  * Load the admin product list from the Nest backend itself:
  * `GET ${NEXT_PUBLIC_API_URL}/products` with the admin JWT.
- * The browser never calls a Next.js `/api/products` route for this list.
  */
 export async function loadProductList(query: ProductListQuery): Promise<ProductListLoad> {
   const token = await getSessionToken();
