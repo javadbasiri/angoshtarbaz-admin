@@ -19,8 +19,11 @@ export default function DashboardPage() {
             کنید.
           </p>
           <div className="page-actions" style={{ justifyContent: "flex-start", paddingBottom: 0 }}>
-            <Link className="btn btn--primary" href="/products/new">
-              رفتن به افزودن محصول →
+            <Link className="btn btn--primary" href="/products">
+              فهرست محصولات →
+            </Link>
+            <Link className="btn btn--secondary" href="/products/new">
+              افزودن محصول →
             </Link>
             <Link className="btn btn--secondary" href="/products/prd_solitaire_01/edit">
               ویرایش محصول نمونه →

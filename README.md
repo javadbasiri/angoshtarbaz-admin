@@ -8,8 +8,9 @@
 - **ANG-A1** — افزودن محصول: فرم کامل، پیش‌نمایش کارت زنده، اعتبارسنجی، اسکلتون، بنر/توست موفقیت، اتصال به API.
 - **ANG-A2** — ویرایش محصول: `GET /products/:id` برای پر کردن فرم، `PATCH` برای ذخیره، اسکلتون / یافت‌نشد / خطا با تلاش مجدد / ذخیره / اعتبارسنجی / بنر موفقیت. قیمت UI تومان است و API ریال (÷۱۰ نمایش، ×۱۰ ذخیره).
 - **ANG-A3** — گالری مرکزی رسانه: صفحه `/gallery`، آپلود presign→PUT→ثبت، چندانتخاب/حذف، و مودال «انتخاب از گالری» روی افزودن/ویرایش محصول (`imageIds[]`).
+- **ANG-A4** — فهرست محصولات: `/products` (و alias `/admin/products`). سرور Next مستقیماً `GET {NEXT_PUBLIC_API_URL}/products` را با JWT کوکی httpOnly صدا می‌زند. ستون موجودی عمداً نیست.
 - احراز هویت JWT ادمین با کوکی **httpOnly**.
-- خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، فهرست محصولات، دیپلوی.
+- خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، دیپلوی.
 
 ## Stack
 
@@ -72,7 +73,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 | رمز | `admin123456` |
 | نقش | `admin` (JWT) |
 
-ورود از `/login` به `POST {API}/auth/login` پروکسی می‌شود و توکن در کوکی httpOnly `angoshtarbaz_admin_session` ذخیره می‌گردد. مسیرهای ادمین بدون نشست به `/login` می‌روند.
+ورود از `/login` یک Server Action است که `POST {API}/auth/login` را صدا می‌زند و توکن را در کوکی httpOnly `angoshtarbaz_admin_session` ذخیره می‌کند. مسیرهای ادمین بدون نشست به `/login` می‌روند. پاسخ ۴۰۱ از بک‌اند همان کوکی را پاک می‌کند و به `/login` برمی‌گرداند.
 
 اگر کاربر ادمین از قبل در دیتابیس بوده، اجرای دوبارهٔ سید رمز `admin123456` را بازنشانی نمی‌کند.
 
@@ -82,33 +83,35 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 | --- | --- |
 | `/login` | ورود JWT |
 | `/` و `/dashboard` | داشبورد / placeholder داخل پوسته |
+| `/products` | فهرست محصولات (ANG-A4) — جستجو، فیلتر وضعیت، صفحه‌بندی در query string |
 | `/products/new` | افزودن محصول (ANG-A1) |
 | `/products/[id]/edit` | ویرایش محصول (ANG-A2) |
 | `/gallery` | گالری مرکزی رسانه (ANG-A3) |
 | `/admin` و `/admin/products/new` | redirect به مسیرهای بالا (سازگاری اسکلت) |
+| `/admin/products` | redirect به `/products` (query حفظ می‌شود) |
 | `/admin/products/[id]/edit` | redirect به `/products/[id]/edit` |
 | `/admin/gallery` و `/admin/media` | redirect به `/gallery` |
 
 ## API mapping
 
-پنل مرورگر را مستقیم به بک‌اند وصل نمی‌کند؛ درخواست‌ها از BFF همین اپ (`/api/*`) با هدر `Authorization: Bearer <jwt>` فوروارد می‌شوند.
+ادمین Route Handler ندارد. همهٔ فراخوانی‌ها از سرور Next (صفحه یا Server Action) با `Authorization: Bearer` و JWT کوکی httpOnly به `{NEXT_PUBLIC_API_URL}` می‌روند. توکن به جاوااسکریپت مرورگر داده نمی‌شود.
 
-| Admin UI | BFF | Backend |
+| Admin UI | فراخوانی سرور | Backend |
 | --- | --- | --- |
-| ورود | `POST /api/auth/login` | `POST /auth/login` (fallback: `/auth/signin`, `/login`) |
-| خروج | `POST /api/auth/logout` | پاک کردن کوکی |
-| نشست | `GET /api/auth/me` | `GET /auth/me` |
-| کالکشن‌ها | `GET /api/collections` | `GET /collections` — اگر نبود، سولیتر / وینتیج / طلای سفید |
-| ایجاد محصول | `POST /api/products` | `POST /products` سپس `GET /products/:id` |
-| خواندن محصول | `GET /api/products/:id` | `GET /products/:id` — عمومی روی بک‌اند (شامل پیش‌نویس)؛ BFF همچنان نشست ادمین می‌خواهد |
-| ویرایش محصول | `PATCH /api/products/:id` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری؛ همان شکل ایجاد |
-| فهرست گالری | `GET /api/gallery` | `GET /gallery` — `{ data, meta }` |
-| Presign آپلود | `POST /api/gallery/presign` | `POST /gallery/presign` → `{ uploadUrl, headers, key, publicUrl, provider }` |
-| آپلود بایت | `PUT /api/gallery/upload/:key` | `PUT /gallery/upload/:key` (mock) یا URL امضاشده S3 |
-| ثبت فایل | `POST /api/gallery` | `POST /gallery` — بعد از آپلود؛ `id` برای `imageIds[]` |
-| حذف فایل | `DELETE /api/gallery/:id` | `DELETE /gallery/:id` |
-| فایل عمومی (mock) | — | `GET /gallery/files/:key` |
-| آپلود قدیمی | `POST /api/uploads` | `POST /uploads` — سازگاری؛ جریان اصلی گالری است |
+| ورود | `loginAction` | `POST /auth/login` |
+| خروج | `logoutAction` | پاک کردن کوکی؛ بدون درخواست بک‌اند |
+| کاربر فعلی | `loadCurrentUser` در لایهٔ `(shell)` | `GET /auth/profile` — `{ id, email, firstName, lastName, role }` |
+| کالکشن‌ها | `loadCollectionsAction` | `GET /collections` — اگر خالی یا قطع بود، سولیتر / وینتیج / طلای سفید |
+| فهرست محصولات | صفحهٔ سروری | `GET /products?status=&search=&page=&limit=` |
+| ایجاد محصول | `createProductAction` سپس `getProductAction` | `POST /products` سپس `GET /products/:id` |
+| خواندن محصول | `loadProductForEdit` / `getProductAction` | `GET /products/:id` — عمومی روی بک‌اند (شامل پیش‌نویس)؛ ادمین همچنان نشست می‌خواهد |
+| ویرایش محصول | `updateProductAction` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری |
+| فهرست گالری | `listGalleryAction` | `GET /gallery` — `{ data, meta }` |
+| Presign آپلود | `presignGalleryAction` | `POST /gallery/presign` |
+| آپلود بایت | مرورگر، مستقیم به `uploadUrl` | `PUT` با هدرهای presign و بدون JWT. mock: `?token=` روی خود API. s3: URL امضاشده |
+| ثبت فایل | `registerGalleryAction` | `POST /gallery` — `id` برای `imageIds[]` |
+| حذف فایل | `deleteGalleryAction` | `DELETE /gallery/:id` |
+| فایل عمومی (mock) | مرورگر، مستقیم | `GET /gallery/files/:key` |
 
 ### `POST /products` body
 
@@ -145,11 +148,9 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 
 ## Gallery upload (ANG-A3)
 
-آپلود از مرورگر مستقیم به S3 نمی‌رود مگر `uploadUrl` امضاشده باشد. جریان:
-
-1. `POST /api/gallery/presign` با `{ filename, contentType, size }`
-2. `PUT` بایت فایل به `uploadUrl` (برای mock، BFF آن را به `/api/gallery/upload/:key` بازنویسی می‌کند تا JWT httpOnly همراه شود)
-3. `POST /api/gallery` برای ثبت متادیتا و گرفتن `id`
+1. Server Action: `POST /gallery/presign` با `{ filename, contentType, size, kind }` و JWT ادمین
+2. مرورگر `PUT` بایت را مستقیم به `uploadUrl` می‌فرستد، با هدرهای presign و بدون `Authorization`. برای `provider: "mock"` آدرس روی خود API است و `?token=` احراز هویت است. برای `provider: "s3"` آدرس امضاشدهٔ باکت است.
+3. Server Action: `POST /gallery` برای ثبت و گرفتن `id`
 4. تازه‌سازی گرید / پیوست به محصول با `imageIds[]`
 
 قالب مجاز: JPG / PNG / WebP تا ۱۲ مگابایت و MP4 تا ۵۰ مگابایت. اگر بک‌اند در دسترس نباشد صفحه گالری و مودال انتخاب خطا را نشان می‌دهند.
@@ -179,7 +180,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 | `npm run build` | بیلد پروداکشن |
 | `npm run start` | سرو بیلد روی :3001 |
 | `npm run lint` | ESLint |
-| `npm test` | تست واحد استخراج توکن ورود |
+| `npm test` | تست واحد قیمت، query فهرست، نام هدر، مقصد آپلود گالری، و استخراج توکن ورود |
 
 ## Env
 
