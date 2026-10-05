@@ -18,11 +18,15 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
-function messageFromBody(body: unknown, fallback: string): string {
+export function messageFromBody(body: unknown, fallback: string): string {
   if (!body) return fallback;
   if (typeof body === "string" && body.trim()) return body;
   if (typeof body === "object") {
     const record = body as Record<string, unknown>;
+    if (Array.isArray(record.message)) {
+      const parts = record.message.filter((item): item is string => typeof item === "string" && Boolean(item));
+      if (parts.length) return parts.join(" ");
+    }
     for (const key of ["message", "error", "detail", "title"]) {
       if (typeof record[key] === "string" && record[key]) {
         return record[key] as string;
@@ -182,16 +186,3 @@ export function extractCollections(body: unknown): CollectionOption[] {
     .filter((item): item is CollectionOption => item !== null);
 }
 
-export function extractUploadResult(body: unknown): { id?: string; url?: string } {
-  const root = asRecord(body);
-  const data = asRecord(root?.data) ?? asRecord(root?.file) ?? asRecord(root?.image) ?? root;
-  return {
-    id: data?.id != null ? String(data.id) : data?._id != null ? String(data._id) : undefined,
-    url:
-      typeof data?.url === "string"
-        ? data.url
-        : typeof data?.src === "string"
-          ? data.src
-          : undefined,
-  };
-}

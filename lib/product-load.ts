@@ -14,15 +14,18 @@ function messageFromUnknown(body: unknown, fallback: string): string {
 export async function loadProductForEdit(productId: string): Promise<ProductEditLoadState> {
   const token = await getSessionToken();
   if (!token) {
-    return { status: "error", message: "نشست منقضی شده است." };
+    return { status: "unauthorized" };
   }
 
   try {
     const [productResult, collectionsResult] = await Promise.all([
-      backendFetch(`/products/${productId}`, { method: "GET" }, token),
+      backendFetch(`/products/${encodeURIComponent(productId)}`, { method: "GET" }, token),
       backendFetch("/collections", { method: "GET" }, token).catch(() => null),
     ]);
 
+    if (productResult.response.status === 401 || collectionsResult?.response.status === 401) {
+      return { status: "unauthorized" };
+    }
     if (productResult.response.status === 404) {
       return { status: "not-found" };
     }

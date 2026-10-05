@@ -15,5 +15,10 @@ export const env = {
       process.env.NEXT_PUBLIC_API_BASE_URL ??
       DEFAULT_API_URL,
   ),
-  loginPath: process.env.API_LOGIN_PATH?.replace(/\/$/, "") || "/auth/login",
 } as const;
+
+/** Nest admin login. One path — no alternate sign-in routes. */
+export const AUTH_LOGIN_PATH = "/auth/login";
+
+/** Nest current-user. One path — no `/users/me` or `/admin/me` alternates. */
+export const AUTH_ME_PATH = "/auth/me";

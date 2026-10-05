@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiFetch, ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api";
+import { loadCollectionsAction } from "@/lib/collection-actions";
+import { listGalleryAction } from "@/lib/gallery-actions";
 import { formValuesToPayload } from "@/lib/product-map";
 import { formatTomanInput, parseTomanInput, slugifyName } from "@/lib/format";
-import { galleryItemsFromClientPayload } from "@/lib/gallery";
 import { uploadFileToGallery } from "@/lib/gallery-upload";
+import { rethrowNextRedirect } from "@/lib/redirect-error";
+import { signalSessionExpired } from "@/lib/session-expired";
 import { SAMPLE_PRODUCT } from "@/lib/product-sample";
 import { FALLBACK_COLLECTIONS, type CollectionOption } from "@/types/collection";
 import type { GalleryAsset } from "@/types/gallery";
@@ -26,17 +29,6 @@ export type FormAlert =
 
 function newImageId() {
   return `img-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function parseCollections(
-  payload: { collections?: CollectionOption[] } | CollectionOption[],
-): CollectionOption[] {
-  const list = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload.collections)
-      ? payload.collections
-      : [];
-  return list;
 }
 
 export function useProductForm({
@@ -74,8 +66,12 @@ export function useProductForm({
     let cancelled = false;
     async function hydrateGallery() {
       try {
-        const payload = await apiFetch<unknown>({ path: "/api/gallery?limit=100" });
-        const library = galleryItemsFromClientPayload(payload);
+        const result = await listGalleryAction(100);
+        if (!result.ok) {
+          if (result.status === 401) signalSessionExpired();
+          return;
+        }
+        const library = result.data.items;
         const byId = new Map(library.map((asset) => [asset.id, asset]));
         if (cancelled) return;
         setValues((current) => ({
@@ -91,8 +87,8 @@ export function useProductForm({
             };
           }),
         }));
-      } catch {
-        // Keep whatever URLs the product payload already had.
+      } catch (error) {
+        rethrowNextRedirect(error);
       }
     }
     void hydrateGallery();
@@ -106,10 +102,13 @@ export function useProductForm({
     let cancelled = false;
     async function load() {
       try {
-        const payload = await apiFetch<{ collections?: CollectionOption[] } | CollectionOption[]>(
-          { path: "/api/collections" },
-        );
-        const list = parseCollections(payload);
+        const result = await loadCollectionsAction();
+        if (!result.ok) {
+          if (result.status === 401) signalSessionExpired();
+          if (!cancelled) setCollections(FALLBACK_COLLECTIONS);
+          return;
+        }
+        const list = result.data;
         if (!cancelled && list.length > 0) {
           setCollections(list);
           setValues((current) => {
@@ -122,7 +121,8 @@ export function useProductForm({
             return current;
           });
         }
-      } catch {
+      } catch (error) {
+        rethrowNextRedirect(error);
         if (!cancelled) setCollections(FALLBACK_COLLECTIONS);
       } finally {
         if (!cancelled) setBootstrapping(false);
@@ -252,6 +252,7 @@ export function useProductForm({
         imageIds.push(uploaded.id);
         if (uploaded.publicUrl) urls.push(uploaded.publicUrl);
       } catch (error) {
+        rethrowNextRedirect(error);
         if (error instanceof ApiError) throw error;
         throw new ApiError("آپلود تصویر گالری ناموفق بود.", 502);
       }

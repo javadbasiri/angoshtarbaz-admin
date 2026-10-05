@@ -102,6 +102,7 @@ export type PatchProductRequest = Partial<CreateProductRequest>;
 
 export type ProductEditLoadState =
   | { status: "loading" }
+  | { status: "unauthorized" }
   | { status: "not-found" }
   | { status: "error"; message: string }
   | {

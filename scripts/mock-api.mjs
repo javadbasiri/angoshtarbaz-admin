@@ -308,7 +308,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const accessToken = `mock.${randomUUID()}`;
-      tokens.set(accessToken, { email: SEED_EMAIL, role: "admin" });
+      tokens.set(accessToken, { email: SEED_EMAIL, role: "admin", name: "ادمین فروشگاه" });
       send(
         res,
         200,

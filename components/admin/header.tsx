@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useAdminDisplayName } from "@/components/admin/current-user";
 import { MenuIcon } from "@/components/admin/icons";
 import { useAdminShell } from "@/components/admin/shell-context";
+import { logoutAction } from "@/lib/auth-actions";
+import { rethrowNextRedirect } from "@/lib/redirect-error";
 
 export type AdminBreadcrumbItem = {
   href?: string;
@@ -22,12 +24,13 @@ export function AdminHeader({
   title,
   eyebrow,
   breadcrumb,
-  userName = "ادمین فروشگاه",
+  userName,
 }: AdminHeaderProps) {
+  const sessionName = useAdminDisplayName();
+  const displayName = userName || sessionName;
   const { sidebarOpen, toggleSidebar, setSidebarOpen } = useAdminShell();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
@@ -40,10 +43,12 @@ export function AdminHeader({
   }, []);
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
     setSidebarOpen(false);
-    router.push("/login");
-    router.refresh();
+    try {
+      await logoutAction();
+    } catch (error) {
+      rethrowNextRedirect(error);
+    }
   }
 
   return (
@@ -98,7 +103,7 @@ export function AdminHeader({
             <span className="user-chip__avatar" aria-hidden="true">
               ا
             </span>
-            <span className="user-chip__name">{userName}</span>
+            <span className="user-chip__name">{displayName}</span>
           </button>
           {menuOpen ? (
             <div className="user-menu__dropdown" role="menu">
