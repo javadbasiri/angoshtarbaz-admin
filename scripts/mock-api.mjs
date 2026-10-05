@@ -358,7 +358,7 @@ const server = http.createServer(async (req, res) => {
       if (!requireAdmin(req, res, origin)) return;
       const payload = JSON.parse((await readBody(req)).toString("utf8") || "{}");
       const filename = payload.filename || "upload.bin";
-      const contentType = payload.contentType || payload.mimeType || "application/octet-stream";
+      const contentType = payload.mime || payload.contentType || payload.mimeType || "application/octet-stream";
       const size = Number(payload.size || 0);
       const kind = galleryKind(contentType, filename);
       if (!ALLOWED_TYPES.has(contentType) && !/\.(jpe?g|png|webp|mp4)$/i.test(filename)) {
@@ -438,12 +438,12 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const id = randomUUID();
-      const filename = payload.filename || payload.originalName || file.filename;
-      const mimeType = payload.mimeType || payload.contentType || file.contentType;
+      const filename = payload.originalName || payload.filename || file.filename;
+      const mimeType = payload.mime || payload.mimeType || payload.contentType || file.contentType;
       const asset = {
         id,
         key,
-        publicUrl: payload.publicUrl || `${publicOrigin(req)}/gallery/files/${key}`,
+        publicUrl: payload.url || payload.publicUrl || `${publicOrigin(req)}/gallery/files/${key}`,
         filename,
         mimeType,
         size: payload.size ?? file.buffer.length,

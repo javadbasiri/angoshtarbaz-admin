@@ -107,9 +107,9 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 | خواندن محصول | `loadProductForEdit` / `getProductAction` | `GET /products/:id` — عمومی روی بک‌اند (شامل پیش‌نویس)؛ ادمین همچنان نشست می‌خواهد |
 | ویرایش محصول | `updateProductAction` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری |
 | فهرست گالری | `listGalleryAction` | `GET /gallery` — `{ data, meta }` |
-| Presign آپلود | `presignGalleryAction` | `POST /gallery/presign` |
+| Presign آپلود | `presignGalleryAction` | `POST /gallery/presign` — `{ filename, mime, size }` |
 | آپلود بایت | مرورگر، مستقیم به `uploadUrl` | `PUT` با هدرهای presign و بدون JWT. mock: `?token=` روی خود API. s3: URL امضاشده |
-| ثبت فایل | `registerGalleryAction` | `POST /gallery` — `id` برای `imageIds[]` |
+| ثبت فایل | `registerGalleryAction` | `POST /gallery` — `{ url, key, mime, size, originalName }`؛ `id` برای `imageIds[]` |
 | حذف فایل | `deleteGalleryAction` | `DELETE /gallery/:id` |
 | فایل عمومی (mock) | مرورگر، مستقیم | `GET /gallery/files/:key` |
 
@@ -148,9 +148,9 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 
 ## Gallery upload (ANG-A3)
 
-1. Server Action: `POST /gallery/presign` با `{ filename, contentType, size, kind }` و JWT ادمین
+1. Server Action: `POST /gallery/presign` با `{ filename, mime, size }` و JWT ادمین. `contentType` فایل به `mime` نگاشت می‌شود. `kind` فقط در اعتبارسنجی UI (`isAllowedGalleryFile`) می‌ماند.
 2. مرورگر `PUT` بایت را مستقیم به `uploadUrl` می‌فرستد، با هدرهای presign و بدون `Authorization`. برای `provider: "mock"` آدرس روی خود API است و `?token=` احراز هویت است. برای `provider: "s3"` آدرس امضاشدهٔ باکت است.
-3. Server Action: `POST /gallery` برای ثبت و گرفتن `id`
+3. Server Action: `POST /gallery` با `{ url, key, mime, size, originalName }` برای ثبت و گرفتن `id`. `url` همان `publicUrl` پاسخ presign است و `originalName` نام اصلی فایل است.
 4. تازه‌سازی گرید / پیوست به محصول با `imageIds[]`
 
 قالب مجاز: JPG / PNG / WebP تا ۱۲ مگابایت و MP4 تا ۵۰ مگابایت. اگر بک‌اند در دسترس نباشد صفحه گالری و مودال انتخاب خطا را نشان می‌دهند.
@@ -180,7 +180,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 | `npm run build` | بیلد پروداکشن |
 | `npm run start` | سرو بیلد روی :3001 |
 | `npm run lint` | ESLint |
-| `npm test` | تست واحد قیمت، query فهرست، نام هدر، مقصد آپلود گالری، و استخراج توکن ورود |
+| `npm test` | تست واحد قیمت، query فهرست، نام هدر، مقصد آپلود گالری، بدنهٔ presign/ثبت، و استخراج توکن ورود |
 
 ## Env
 
