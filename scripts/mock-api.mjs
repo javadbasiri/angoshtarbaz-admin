@@ -1,10 +1,14 @@
 /**
- * Optional local stand-in for angoshtarbaz-backend when PR #2 / #3 / #4 is not running.
- * Implements login, create/edit product, and the ANG-A3 gallery contract
+ * Optional local stand-in for angoshtarbaz-backend when PR #2 / #3 / #4 / #5 is not running.
+ * Implements login, create/edit product, GET /products list (ANG-A4), and the ANG-A3 gallery contract
  * (presign → PUT upload → register → list/delete + public file serve).
+ *
+ * MOCK_PRODUCTS=empty  — start with no products (empty-state screenshots)
+ * MOCK_LATENCY_MS=2500 — delay GET /products (loading skeleton)
  *
  *   node scripts/mock-api.mjs
  *   # listens on http://localhost:3002
+ *   # then run the admin with NEXT_PUBLIC_API_URL=http://localhost:3002
  */
 import http from "node:http";
 import { randomUUID } from "node:crypto";
@@ -12,8 +16,16 @@ import { randomUUID } from "node:crypto";
 const PORT = Number(process.env.MOCK_API_PORT || 3002);
 const SEED_EMAIL = "admin@angoshtarbaz.local";
 const SEED_PASSWORD = "admin123456";
+const ADMIN_PROFILE = {
+  id: "6f1c2a40-9b3e-4d1a-8c77-2a1b0e5d9f10",
+  email: SEED_EMAIL,
+  firstName: "سارا",
+  lastName: "احمدی",
+  role: "admin",
+};
 
 const tokens = new Map();
+const uploadGrants = new Map();
 const products = new Map();
 const uploads = new Map();
 const galleryAssets = new Map();
@@ -49,9 +61,170 @@ const SEED_SOLITAIRE = {
   imageIds: [],
   urls: [],
   stock: 6,
+  title: "برلیان ۰.۸ قیراط · طلای ۱۸ عیار",
+  currency: "IRR",
+  imageUrl: "",
+  thumbnail: "",
+  updatedAt: "2026-10-01T12:00:00.000Z",
 };
 
-products.set(SEED_SOLITAIRE.id, { ...SEED_SOLITAIRE, specs: { ...SEED_SOLITAIRE.specs } });
+const EXTRA_PRODUCTS = [
+  {
+    id: "prd_trilogy_02",
+    name: "انگشتر سه‌نگین برلیان",
+    slug: "trilogy-diamond-ring",
+    title: "سه نگین ۰.۳ قیراط · طلای زرد",
+    description: "",
+    price: 1_540_000_000,
+    collectionId: "solitaire",
+    status: "draft",
+    sizes: [],
+    specs: {},
+    imageIds: [],
+    urls: [],
+    currency: "IRR",
+    imageUrl: "",
+    thumbnail: "",
+    updatedAt: "2026-09-28T12:00:00.000Z",
+  },
+  {
+    id: "prd_ruby_vintage",
+    name: "انگشتر یاقوت سرخ وینتیج",
+    slug: "ruby-vintage-ring",
+    title: "یاقوت ۱.۲ قیراط · رکاب حکاکی‌شده",
+    description: "",
+    price: 920_000_000,
+    collectionId: "vintage",
+    status: "published",
+    sizes: [],
+    specs: {},
+    imageIds: [],
+    urls: [],
+    currency: "IRR",
+    imageUrl: "",
+    thumbnail: "",
+    updatedAt: "2026-09-20T12:00:00.000Z",
+  },
+  {
+    id: "prd_emerald_halo",
+    name: "انگشتر زمرد هاله‌ای",
+    slug: "emerald-halo-ring",
+    title: "زمرد کلمبیا · هاله برلیان",
+    description: "",
+    price: 865_000_000,
+    collectionId: "vintage",
+    status: "draft",
+    sizes: [],
+    specs: {},
+    imageIds: [],
+    urls: [],
+    currency: "IRR",
+    imageUrl: "",
+    thumbnail: "",
+    updatedAt: "2026-09-18T12:00:00.000Z",
+  },
+  {
+    id: "prd_sapphire_03",
+    name: "انگشتر یاقوت کبود",
+    slug: "sapphire-ring",
+    title: "یاقوت کبود ۰.۹ قیراط · طلای ۱۸ عیار",
+    description: "",
+    price: 742_000_000,
+    collectionId: "vintage",
+    status: "published",
+    sizes: [],
+    specs: {},
+    imageIds: [],
+    urls: [],
+    currency: "IRR",
+    imageUrl: "",
+    thumbnail: "",
+    updatedAt: "2026-09-12T12:00:00.000Z",
+  },
+  {
+    id: "prd_halfset_ring",
+    name: "حلقه نیم‌ست برلیان",
+    slug: "halfset-ring",
+    title: "ردیف برلیان ریز · طلای سفید",
+    description: "",
+    price: 489_000_000,
+    collectionId: "white-gold",
+    status: "published",
+    sizes: [],
+    specs: {},
+    imageIds: [],
+    urls: [],
+    currency: "IRR",
+    imageUrl: "",
+    thumbnail: "",
+    updatedAt: "2026-09-08T12:00:00.000Z",
+  },
+  {
+    id: "prd_pearl_white",
+    name: "انگشتر مروارید طلای سفید",
+    slug: "pearl-white-ring",
+    title: "مروارید آب شیرین · طلای سفید ۱۸ عیار",
+    description: "",
+    price: 183_000_000,
+    collectionId: "white-gold",
+    status: "published",
+    sizes: [],
+    specs: {},
+    imageIds: [],
+    urls: [],
+    currency: "IRR",
+    imageUrl: "",
+    thumbnail: "",
+    updatedAt: "2026-09-04T12:00:00.000Z",
+  },
+  {
+    id: "prd_band_white",
+    name: "حلقه طلای سفید ساده",
+    slug: "white-gold-band",
+    title: "عرض ۳ میلی‌متر · پرداخت مات",
+    description: "",
+    price: 126_000_000,
+    collectionId: "white-gold",
+    status: "published",
+    sizes: [],
+    specs: {},
+    imageIds: [],
+    urls: [],
+    currency: "IRR",
+    imageUrl: "",
+    thumbnail: "",
+    updatedAt: "2026-09-01T12:00:00.000Z",
+  },
+];
+
+if (process.env.MOCK_PRODUCTS !== "empty") {
+  products.set(SEED_SOLITAIRE.id, { ...SEED_SOLITAIRE, specs: { ...SEED_SOLITAIRE.specs } });
+  for (const product of EXTRA_PRODUCTS) products.set(product.id, product);
+}
+
+const LIST_LATENCY_MS = Number(process.env.MOCK_LATENCY_MS || 0);
+
+function collectionNameOf(product) {
+  if (typeof product.collection === "string" && product.collection) return product.collection;
+  const found = collections.find((item) => item.id === product.collectionId);
+  return found ? found.name : "";
+}
+
+function toListItem(product) {
+  return {
+    id: product.id,
+    slug: product.slug || "",
+    name: product.name || "",
+    title: product.title || "",
+    price: product.price,
+    currency: product.currency || "IRR",
+    status: product.status === "published" ? "published" : "draft",
+    imageUrl: product.imageUrl || (Array.isArray(product.urls) ? product.urls[0] || "" : ""),
+    thumbnail: product.thumbnail || "",
+    collection: collectionNameOf(product),
+    updatedAt: product.updatedAt || "",
+  };
+}
 
 function send(res, status, body, origin) {
   const headers = {
@@ -144,23 +317,34 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const accessToken = `mock.${randomUUID()}`;
-      tokens.set(accessToken, { email: SEED_EMAIL, role: "admin" });
+      tokens.set(accessToken, { ...ADMIN_PROFILE });
       send(
         res,
         200,
         {
           accessToken,
-          user: { email: SEED_EMAIL, role: "admin", name: "ادمین فروشگاه" },
+          user: { ...ADMIN_PROFILE },
         },
         origin,
       );
       return;
     }
 
-    if (req.method === "GET" && url.pathname === "/auth/me") {
+    if (req.method === "GET" && url.pathname === "/auth/profile") {
       const session = requireAdmin(req, res, origin);
       if (!session) return;
-      send(res, 200, { user: session }, origin);
+      send(
+        res,
+        200,
+        {
+          id: session.id,
+          email: session.email,
+          firstName: session.firstName,
+          lastName: session.lastName,
+          role: session.role,
+        },
+        origin,
+      );
       return;
     }
 
@@ -190,11 +374,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const key = `gallery/${randomUUID()}-${safeFilename(filename)}`;
+      const uploadToken = randomUUID();
+      uploadGrants.set(uploadToken, key);
       send(
         res,
         200,
         {
-          uploadUrl: `${publicOrigin(req)}/gallery/upload/${key}`,
+          uploadUrl: `${publicOrigin(req)}/gallery/upload/${key}?token=${encodeURIComponent(uploadToken)}`,
           headers: { "Content-Type": contentType },
           key,
           publicUrl: `${publicOrigin(req)}/gallery/files/${key}`,
@@ -207,8 +393,12 @@ const server = http.createServer(async (req, res) => {
 
     const uploadMatch = url.pathname.match(/^\/gallery\/upload\/(.+)$/);
     if (uploadMatch && req.method === "PUT") {
-      if (!requireAdmin(req, res, origin)) return;
       const key = decodeURIComponent(uploadMatch[1]);
+      const grant = url.searchParams.get("token");
+      if (!grant || uploadGrants.get(grant) !== key) {
+        send(res, 401, { message: "توکن آپلود نامعتبر است." }, origin);
+        return;
+      }
       const buffer = await readBody(req);
       const contentType = req.headers["content-type"] || "application/octet-stream";
       galleryFiles.set(key, { buffer, contentType, filename: key.split("/").pop() || key });
@@ -298,6 +488,41 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/products") {
+      if (!requireAdmin(req, res, origin)) return;
+      if (LIST_LATENCY_MS > 0) {
+        await new Promise((resolve) => setTimeout(resolve, LIST_LATENCY_MS));
+      }
+      const status = url.searchParams.get("status") || "all";
+      const search = (url.searchParams.get("search") || "").trim().toLowerCase();
+      const page = Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1);
+      const limitRaw = Number.parseInt(url.searchParams.get("limit") || "20", 10);
+      const limit = Math.min(100, Math.max(1, Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 20));
+      let items = [...products.values()];
+      if (status === "published" || status === "draft") {
+        items = items.filter((product) => product.status === status);
+      }
+      if (search) {
+        items = items.filter((product) => {
+          const haystack = [
+            product.name,
+            product.title,
+            product.slug,
+            product.id,
+            collectionNameOf(product),
+          ]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(search);
+        });
+      }
+      const total = items.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit) || 1);
+      const data = items.slice((page - 1) * limit, page * limit).map(toListItem);
+      send(res, 200, { data, meta: { page, limit, total, totalPages } }, origin);
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/products") {
       if (!requireAdmin(req, res, origin)) return;
       const payload = JSON.parse((await readBody(req)).toString("utf8") || "{}");
@@ -319,6 +544,11 @@ const server = http.createServer(async (req, res) => {
         imageIds: payload.imageIds ?? [],
         urls: payload.urls ?? [],
         stock: payload.stock ?? 0,
+        title: payload.title || "",
+        currency: "IRR",
+        imageUrl: Array.isArray(payload.urls) ? payload.urls[0] || "" : "",
+        thumbnail: "",
+        updatedAt: new Date().toISOString(),
       };
       products.set(id, product);
       send(res, 201, product, origin);
@@ -368,5 +598,7 @@ server.listen(PORT, () => {
   console.log(`angoshtarbaz mock API listening on http://localhost:${PORT}`);
   console.log(`seed: ${SEED_EMAIL} / ${SEED_PASSWORD}`);
   console.log(`sample product GET /products/${SEED_SOLITAIRE.id}`);
-  console.log("gallery: POST /gallery/presign · PUT /gallery/upload/:key · POST/GET /gallery");
+  console.log("list: GET /products?status=&search=&page=&limit= (JWT)");
+  console.log("profile: GET /auth/profile (JWT)");
+  console.log("gallery: POST /gallery/presign · PUT /gallery/upload/:key?token= · POST/GET /gallery");
 });

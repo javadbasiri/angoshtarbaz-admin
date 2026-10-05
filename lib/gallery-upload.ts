@@ -1,11 +1,8 @@
-import { apiFetch, ApiError } from "@/lib/api";
-import {
-  extractGalleryAsset,
-  extractPresign,
-  isAllowedGalleryFile,
-  registerPayload,
-} from "@/lib/gallery";
-import type { GalleryAsset, GalleryPresign } from "@/types/gallery";
+import { ApiError } from "@/lib/api";
+import { unwrapAction } from "@/lib/call-action";
+import { presignGalleryAction, registerGalleryAction } from "@/lib/gallery-actions";
+import { isAllowedGalleryFile } from "@/lib/gallery";
+import type { GalleryAsset } from "@/types/gallery";
 
 function putWithProgress(
   url: string,
@@ -16,9 +13,8 @@ function putWithProgress(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
-    xhr.withCredentials = url.startsWith("/") || url.startsWith(window.location.origin);
     for (const [name, value] of Object.entries(headers)) {
-      if (name.toLowerCase() === "host") continue;
+      if (name.toLowerCase() === "host" || name.toLowerCase() === "authorization") continue;
       xhr.setRequestHeader(name, value);
     }
     if (!Object.keys(headers).some((name) => name.toLowerCase() === "content-type") && file.type) {
@@ -42,6 +38,11 @@ function putWithProgress(
   });
 }
 
+/**
+ * Presign on the server (admin JWT), then PUT the bytes from the browser to
+ * `uploadUrl`. Mock auth is the `?token=` on that URL; S3 auth is the signed
+ * URL. Neither PUT sends the admin JWT. Register stays on the server.
+ */
 export async function uploadFileToGallery(
   file: File,
   onProgress?: (percent: number) => void,
@@ -51,22 +52,16 @@ export async function uploadFileToGallery(
     throw new ApiError(allowed.message, 400);
   }
 
+  const contentType = file.type || (allowed.kind === "video" ? "video/mp4" : "image/jpeg");
   onProgress?.(8);
-  const presignBody = await apiFetch<unknown>({
-    path: "/api/gallery/presign",
-    method: "POST",
-    body: JSON.stringify({
+  const presign = await unwrapAction(
+    await presignGalleryAction({
       filename: file.name,
-      contentType: file.type || (allowed.kind === "video" ? "video/mp4" : "image/jpeg"),
+      contentType,
       size: file.size,
       kind: allowed.kind,
     }),
-  });
-
-  const presign = extractPresign(presignBody);
-  if (!presign) {
-    throw new ApiError("پاسخ presign گالری ناقص است.", 502);
-  }
+  );
 
   onProgress?.(18);
   await putWithProgress(presign.uploadUrl, file, presign.headers, (percent) => {
@@ -74,27 +69,16 @@ export async function uploadFileToGallery(
   });
 
   onProgress?.(92);
-  const registered = await apiFetch<unknown>({
-    path: "/api/gallery",
-    method: "POST",
-    body: JSON.stringify(
-      registerPayload({
-        key: presign.key,
-        publicUrl: presign.publicUrl,
-        filename: file.name,
-        mimeType: file.type || (allowed.kind === "video" ? "video/mp4" : "application/octet-stream"),
-        size: file.size,
-        kind: allowed.kind,
-      }),
-    ),
-  });
-
-  const asset = extractGalleryAsset(registered);
-  if (!asset) {
-    throw new ApiError("ثبت فایل در گالری ناموفق بود.", 502);
-  }
+  const asset = await unwrapAction(
+    await registerGalleryAction({
+      key: presign.key,
+      publicUrl: presign.publicUrl,
+      filename: file.name,
+      mimeType: contentType,
+      size: file.size,
+      kind: allowed.kind,
+    }),
+  );
   onProgress?.(100);
   return asset;
 }
-
-export type { GalleryPresign };

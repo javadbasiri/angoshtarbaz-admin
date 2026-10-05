@@ -7,6 +7,8 @@ import type { CollectionOption } from "@/types/collection";
 import { extractProduct } from "@/lib/product-map";
 import type { CreatedProduct } from "@/types/product";
 
+export { extractToken } from "@/lib/login-response";
+
 async function readBody(response: Response): Promise<unknown> {
   if (response.status === 204) return undefined;
   const text = await response.text();
@@ -18,11 +20,15 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
-function messageFromBody(body: unknown, fallback: string): string {
+export function messageFromBody(body: unknown, fallback: string): string {
   if (!body) return fallback;
   if (typeof body === "string" && body.trim()) return body;
   if (typeof body === "object") {
     const record = body as Record<string, unknown>;
+    if (Array.isArray(record.message)) {
+      const parts = record.message.filter((item): item is string => typeof item === "string" && Boolean(item));
+      if (parts.length) return parts.join(" ");
+    }
     for (const key of ["message", "error", "detail", "title"]) {
       if (typeof record[key] === "string" && record[key]) {
         return record[key] as string;
@@ -88,21 +94,6 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-export function extractToken(body: unknown): string | null {
-  const root = asRecord(body);
-  if (!root) return null;
-  const nested = asRecord(root.data) ?? asRecord(root.result) ?? root;
-  const bags = [nested, root, asRecord(nested.tokens), asRecord(root.tokens)];
-
-  for (const bag of bags) {
-    if (!bag) continue;
-    for (const key of ["accessToken", "access_token", "token", "jwt", "idToken"]) {
-      if (typeof bag[key] === "string" && bag[key]) return bag[key] as string;
-    }
-  }
-  return null;
-}
-
 export function extractUser(body: unknown, emailFallback?: string): AdminUser | null {
   const root = asRecord(body);
   if (!root) return null;
@@ -122,10 +113,14 @@ export function extractUser(body: unknown, emailFallback?: string): AdminUser | 
     (typeof candidate.role === "string" && candidate.role) ||
     (Array.isArray(candidate.roles) ? String(candidate.roles[0] ?? "admin") : "admin");
 
+  const firstName = typeof candidate.firstName === "string" ? candidate.firstName : undefined;
+  const lastName = typeof candidate.lastName === "string" ? candidate.lastName : undefined;
+
   return {
     id: candidate.id != null ? String(candidate.id) : undefined,
     email,
-    name: typeof candidate.name === "string" ? candidate.name : undefined,
+    firstName,
+    lastName,
     role,
   };
 }
@@ -182,16 +177,3 @@ export function extractCollections(body: unknown): CollectionOption[] {
     .filter((item): item is CollectionOption => item !== null);
 }
 
-export function extractUploadResult(body: unknown): { id?: string; url?: string } {
-  const root = asRecord(body);
-  const data = asRecord(root?.data) ?? asRecord(root?.file) ?? asRecord(root?.image) ?? root;
-  return {
-    id: data?.id != null ? String(data.id) : data?._id != null ? String(data._id) : undefined,
-    url:
-      typeof data?.url === "string"
-        ? data.url
-        : typeof data?.src === "string"
-          ? data.src
-          : undefined,
-  };
-}

@@ -3,19 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertIcon, CloseIcon, PersonPlaceholder, PlayPlaceholder } from "@/components/admin/icons";
 import { MediaThumb } from "@/components/gallery/media-thumb";
-import { apiFetch, ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api";
+import { unwrapAction } from "@/lib/call-action";
+import { listGalleryAction } from "@/lib/gallery-actions";
+import { rethrowNextRedirect } from "@/lib/redirect-error";
 import { placeholderClass } from "@/lib/gallery";
 import { toPersianDigits } from "@/lib/format";
 import type { GalleryAsset, GalleryKind } from "@/types/gallery";
 
 type Filter = "all" | "image" | "video";
-
-function extractList(payload: unknown): GalleryAsset[] {
-  if (payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown }).items)) {
-    return (payload as { items: GalleryAsset[] }).items;
-  }
-  return [];
-}
 
 export function GalleryPickerModal({
   open,
@@ -58,9 +54,11 @@ function GalleryPickerDialog({
     let cancelled = false;
     async function load() {
       try {
-        const payload = await apiFetch<unknown>({ path: "/api/gallery?limit=100" });
-        if (!cancelled) setItems(extractList(payload));
+        const listed = await unwrapAction(await listGalleryAction(100));
+        if (!cancelled) setItems(listed.items);
       } catch (err) {
+        rethrowNextRedirect(err);
+        if (err instanceof ApiError && err.status === 401) return;
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "بارگذاری گالری ناموفق بود.");
         }

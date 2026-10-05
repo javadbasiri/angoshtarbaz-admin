@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ApiError, apiFetch } from "@/lib/api";
+import { loginAction } from "@/lib/auth-actions";
 
 const SEED_EMAIL = "admin@angoshtarbaz.local";
 const SEED_PASSWORD = "admin123456";
@@ -20,16 +20,16 @@ export function LoginForm() {
     setPending(true);
     setError(null);
     try {
-      await apiFetch({
-        path: "/api/auth/login",
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
+      const result = await loginAction({ email, password });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
       const next = searchParams.get("next") || "/";
-      router.push(next);
+      router.push(next.startsWith("/") && !next.startsWith("//") ? next : "/");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ورود ناموفق بود.");
+    } catch {
+      setError("ورود ناموفق بود.");
     } finally {
       setPending(false);
     }

@@ -4,7 +4,10 @@ import { AlertIcon, CheckIcon } from "@/components/admin/icons";
 import { ProductFormFields } from "@/components/product/product-form-fields";
 import { ProductFormSkeleton } from "@/components/product/product-skeleton";
 import { useProductForm } from "@/components/product/use-product-form";
-import { apiFetch, ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api";
+import { unwrapAction } from "@/lib/call-action";
+import { createProductAction, getProductAction } from "@/lib/product-actions";
+import { rethrowNextRedirect } from "@/lib/redirect-error";
 import { sampleProductFormValues } from "@/lib/product-sample";
 import { emptyProductFormValues, type CreatedProduct, type ProductStatus } from "@/types/product";
 
@@ -22,19 +25,21 @@ export function ProductForm({ prefillSample = false }: { prefillSample?: boolean
       const payload = await form.buildPayload(status);
       if (!payload) return;
 
-      const created = await apiFetch<CreatedProduct>({
-        path: "/api/products",
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const created = await unwrapAction(await createProductAction(payload));
 
-      let confirmed = created;
+      let confirmed: CreatedProduct = created;
       if (created.id) {
         try {
-          confirmed = await apiFetch<CreatedProduct>({
-            path: `/api/products/${created.id}`,
-          });
-        } catch {
+          const loaded = await unwrapAction(await getProductAction(created.id));
+          confirmed = {
+            id: loaded.id,
+            name: loaded.name,
+            slug: loaded.slug,
+            status: loaded.status,
+          };
+        } catch (error) {
+          rethrowNextRedirect(error);
+          if (error instanceof ApiError && error.status === 401) throw error;
           confirmed = created;
         }
       }
@@ -57,6 +62,8 @@ export function ProductForm({ prefillSample = false }: { prefillSample?: boolean
         form.setToast("پیش‌نویس ذخیره شد");
       }
     } catch (error) {
+      rethrowNextRedirect(error);
+      if (error instanceof ApiError && error.status === 401) return;
       const message = error instanceof ApiError ? error.message : "ثبت محصول با خطا روبه‌رو شد.";
       form.setAlert({
         kind: "error",

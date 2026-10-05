@@ -207,37 +207,3 @@ export function registerPayload(input: GalleryRegisterInput): Record<string, unk
     kind: input.kind,
   };
 }
-
-export function galleryItemsFromClientPayload(payload: unknown): GalleryAsset[] {
-  if (payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown }).items)) {
-    return (payload as { items: GalleryAsset[] }).items;
-  }
-  return extractGalleryList(payload).items;
-}
-
-export function rewriteMockUploadUrl(presign: GalleryPresign, apiUrl: string): GalleryPresign {
-  const keyPath = presign.key
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-
-  const sameOriginProxy = `/api/gallery/upload/${keyPath}`;
-  if ((presign.provider || "").toLowerCase() === "mock") {
-    return { ...presign, uploadUrl: sameOriginProxy };
-  }
-
-  try {
-    const absolute = new URL(presign.uploadUrl, apiUrl);
-    const backend = new URL(apiUrl);
-    if (absolute.origin === backend.origin) {
-      return { ...presign, uploadUrl: sameOriginProxy };
-    }
-    return { ...presign, uploadUrl: absolute.toString() };
-  } catch {
-    if (presign.uploadUrl.startsWith("/gallery/upload/")) {
-      return { ...presign, uploadUrl: sameOriginProxy };
-    }
-    return presign;
-  }
-}
