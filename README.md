@@ -8,8 +8,9 @@
 - **ANG-A1** — افزودن محصول: فرم کامل، پیش‌نمایش کارت زنده، اعتبارسنجی، اسکلتون، بنر/توست موفقیت، اتصال به API.
 - **ANG-A2** — ویرایش محصول: `GET /products/:id` برای پر کردن فرم، `PATCH` برای ذخیره، اسکلتون / یافت‌نشد / خطا با تلاش مجدد / ذخیره / اعتبارسنجی / بنر موفقیت. قیمت UI تومان است و API ریال (÷۱۰ نمایش، ×۱۰ ذخیره).
 - **ANG-A3** — گالری مرکزی رسانه: صفحه `/gallery`، آپلود presign→PUT→ثبت، چندانتخاب/حذف، و مودال «انتخاب از گالری» روی افزودن/ویرایش محصول (`imageIds[]`).
+- **ANG-A4** — فهرست محصولات: `/products` (و alias `/admin/products`). سرور Next مستقیماً `GET {NEXT_PUBLIC_API_URL}/products` را با JWT کوکی httpOnly صدا می‌زند. ستون موجودی عمداً نیست.
 - احراز هویت JWT ادمین با کوکی **httpOnly**.
-- خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، فهرست محصولات، دیپلوی.
+- خارج از محدوده: فروشگاه، سفارشات/تنظیمات واقعی، دیپلوی.
 
 ## Stack
 
@@ -63,16 +64,20 @@ ADMIN_ORIGIN=http://localhost:3000
 | --- | --- |
 | `/login` | ورود JWT |
 | `/` و `/dashboard` | داشبورد / placeholder داخل پوسته |
+| `/products` | فهرست محصولات (ANG-A4) — جستجو، فیلتر وضعیت، صفحه‌بندی در query string |
 | `/products/new` | افزودن محصول (ANG-A1) |
 | `/products/[id]/edit` | ویرایش محصول (ANG-A2) |
 | `/gallery` | گالری مرکزی رسانه (ANG-A3) |
 | `/admin` و `/admin/products/new` | redirect به مسیرهای بالا (سازگاری اسکلت) |
+| `/admin/products` | redirect به `/products` (query حفظ می‌شود) |
 | `/admin/products/[id]/edit` | redirect به `/products/[id]/edit` |
 | `/admin/gallery` و `/admin/media` | redirect به `/gallery` |
 
 ## API mapping
 
-پنل مرورگر را مستقیم به بک‌اند وصل نمی‌کند؛ درخواست‌ها از BFF همین اپ (`/api/*`) با هدر `Authorization: Bearer <jwt>` فوروارد می‌شوند.
+ورود، افزودن/ویرایش محصول و گالری هنوز از BFF همین اپ (`/api/*`) می‌گذرند و JWT را با `Authorization: Bearer` به بک‌اند می‌فرستند.
+
+**فهرست محصولات (ANG-A4) از Route Handler استفاده نمی‌کند.** صفحهٔ سروری کوکی httpOnly را می‌خواند و مستقیماً `GET {NEXT_PUBLIC_API_URL}/products?status=&search=&page=&limit=` را صدا می‌زند. `GET /api/products` وجود ندارد (فقط `POST` برای ایجاد محصول مانده است).
 
 | Admin UI | BFF | Backend |
 | --- | --- | --- |
@@ -80,6 +85,7 @@ ADMIN_ORIGIN=http://localhost:3000
 | خروج | `POST /api/auth/logout` | پاک کردن کوکی |
 | نشست | `GET /api/auth/me` | `GET /auth/me` |
 | کالکشن‌ها | `GET /api/collections` | `GET /collections` — اگر نبود، سولیتر / وینتیج / طلای سفید |
+| فهرست محصولات | — (فراخوانی مستقیم سرور) | `GET /products?status=&search=&page=&limit=` |
 | ایجاد محصول | `POST /api/products` | `POST /products` سپس `GET /products/:id` |
 | خواندن محصول | `GET /api/products/:id` | `GET /products/:id` — عمومی روی بک‌اند (شامل پیش‌نویس)؛ BFF همچنان نشست ادمین می‌خواهد |
 | ویرایش محصول | `PATCH /api/products/:id` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری؛ همان شکل ایجاد |
@@ -160,6 +166,7 @@ ADMIN_ORIGIN=http://localhost:3000
 | `npm run build` | بیلد پروداکشن |
 | `npm run start` | سرو بیلد |
 | `npm run lint` | ESLint |
+| `npm test` | تست واحد قیمت و نگاشت query فهرست |
 
 ## Env
 

@@ -44,6 +44,16 @@ export function formatTomanDisplay(toman: number): string {
   return toPersianDigits(grouped);
 }
 
+/**
+ * Admin list / storefront price. Backend `price` is integer IRR;
+ * the label is toman (÷10) with Persian digits and «تومان».
+ * Example: 1_280_000_000 → «۱۲۸٬۰۰۰٬۰۰۰ تومان».
+ */
+export function formatIrrAsToman(irr: number): string {
+  const amount = Number.isFinite(irr) ? irrToToman(irr) : 0;
+  return `${formatTomanDisplay(amount)} تومان`;
+}
+
 export function formatTomanInput(raw: string): string {
   const parsed = parseTomanInput(raw);
   if (parsed === null) {

@@ -8,7 +8,8 @@
     "mock-api": "node scripts/mock-api.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --test lib/format.test.ts lib/product-list.test.ts"
   },
   "dependencies": {
     "next": "16.3.5",
