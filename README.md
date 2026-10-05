@@ -81,7 +81,7 @@ ADMIN_ORIGIN=http://localhost:3000
 | --- | --- | --- |
 | ورود | `loginAction` | `POST /auth/login` |
 | خروج | `logoutAction` | پاک کردن کوکی؛ بدون درخواست بک‌اند |
-| کاربر فعلی | `loadCurrentUser` در لایهٔ `(shell)` | `GET /auth/me` |
+| کاربر فعلی | `loadCurrentUser` در لایهٔ `(shell)` | `GET /auth/profile` — `{ id, email, firstName, lastName, role }` |
 | کالکشن‌ها | `loadCollectionsAction` | `GET /collections` — اگر خالی یا قطع بود، سولیتر / وینتیج / طلای سفید |
 | فهرست محصولات | صفحهٔ سروری | `GET /products?status=&search=&page=&limit=` |
 | ایجاد محصول | `createProductAction` سپس `getProductAction` | `POST /products` سپس `GET /products/:id` |
@@ -89,7 +89,7 @@ ADMIN_ORIGIN=http://localhost:3000
 | ویرایش محصول | `updateProductAction` | `PATCH /products/:id` — JWT ادمین؛ همه فیلدها اختیاری |
 | فهرست گالری | `listGalleryAction` | `GET /gallery` — `{ data, meta }` |
 | Presign آپلود | `presignGalleryAction` | `POST /gallery/presign` |
-| آپلود بایت | مرورگر یا `uploadGalleryFileAction` | `PUT` به `uploadUrl` (S3) یا `PUT /gallery/upload/:key` (mock، با JWT) |
+| آپلود بایت | مرورگر، مستقیم به `uploadUrl` | `PUT` با هدرهای presign و بدون JWT. mock: `?token=` روی خود API. s3: URL امضاشده |
 | ثبت فایل | `registerGalleryAction` | `POST /gallery` — `id` برای `imageIds[]` |
 | حذف فایل | `deleteGalleryAction` | `DELETE /gallery/:id` |
 | فایل عمومی (mock) | مرورگر، مستقیم | `GET /gallery/files/:key` |
@@ -129,10 +129,8 @@ ADMIN_ORIGIN=http://localhost:3000
 
 ## Gallery upload (ANG-A3)
 
-1. Server Action: `POST /gallery/presign` با `{ filename, contentType, size, kind }`
-2. آپلود بایت:
-   - اگر `provider` برابر `s3` / `public` باشد یا `uploadUrl` روی میزبان دیگری باشد، مرورگر خودش `PUT` می‌زند و JWT فرستاده نمی‌شود.
-   - اگر `provider` برابر `mock` باشد یا آدرس روی همان origin بک‌اند باشد، Server Action بایت را با JWT به `PUT /gallery/upload/:key` می‌فرستد. سقف بدنه در `experimental.serverActions.bodySizeLimit` برابر ۶۴ مگابایت است (تصویر ۱۲ و ویدیو ۵۰).
+1. Server Action: `POST /gallery/presign` با `{ filename, contentType, size, kind }` و JWT ادمین
+2. مرورگر `PUT` بایت را مستقیم به `uploadUrl` می‌فرستد، با هدرهای presign و بدون `Authorization`. برای `provider: "mock"` آدرس روی خود API است و `?token=` احراز هویت است. برای `provider: "s3"` آدرس امضاشدهٔ باکت است.
 3. Server Action: `POST /gallery` برای ثبت و گرفتن `id`
 4. تازه‌سازی گرید / پیوست به محصول با `imageIds[]`
 
@@ -163,7 +161,7 @@ ADMIN_ORIGIN=http://localhost:3000
 | `npm run build` | بیلد پروداکشن |
 | `npm run start` | سرو بیلد |
 | `npm run lint` | ESLint |
-| `npm test` | تست واحد قیمت، query فهرست، و مقصد آپلود گالری |
+| `npm test` | تست واحد قیمت، query فهرست، نام هدر، و مقصد آپلود گالری |
 
 ## Env
 

@@ -20,5 +20,5 @@ export const env = {
 /** Nest admin login. One path — no alternate sign-in routes. */
 export const AUTH_LOGIN_PATH = "/auth/login";
 
-/** Nest current-user. One path — no `/users/me` or `/admin/me` alternates. */
-export const AUTH_ME_PATH = "/auth/me";
+/** Nest current admin. There is no `/auth/me`. */
+export const AUTH_PROFILE_PATH = "/auth/profile";

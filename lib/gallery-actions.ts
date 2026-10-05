@@ -3,22 +3,9 @@
 import { actionFail, actionOk, type ActionResult } from "@/lib/action-result";
 import { adminCallToResult, callAdminBackend } from "@/lib/admin-call";
 import { env } from "@/lib/env";
-import {
-  extractGalleryAsset,
-  extractGalleryList,
-  extractPresign,
-  isAllowedGalleryFile,
-  registerPayload,
-} from "@/lib/gallery";
-import {
-  absoluteUploadUrl,
-  encodeGalleryObjectKey,
-  galleryUploadMode,
-  type GalleryUploadMode,
-} from "@/lib/gallery-upload-target";
+import { extractGalleryAsset, extractGalleryList, extractPresign, registerPayload } from "@/lib/gallery";
+import { browserUploadTarget } from "@/lib/gallery-upload-target";
 import type { GalleryAsset, GalleryKind, GalleryListMeta, GalleryPresign, GalleryRegisterInput } from "@/types/gallery";
-
-export type GalleryPresignResult = GalleryPresign & { mode: GalleryUploadMode };
 
 export async function listGalleryAction(
   limit = 100,
@@ -33,7 +20,7 @@ export async function presignGalleryAction(input: {
   contentType: string;
   size: number;
   kind: GalleryKind;
-}): Promise<ActionResult<GalleryPresignResult>> {
+}): Promise<ActionResult<GalleryPresign>> {
   const call = await callAdminBackend("/gallery/presign", {
     method: "POST",
     body: JSON.stringify(input),
@@ -43,45 +30,11 @@ export async function presignGalleryAction(input: {
     (body) => {
       const presign = extractPresign(body);
       if (!presign) return actionFail(502, "پاسخ presign گالری ناقص است.");
-      const mode = galleryUploadMode(presign, env.apiUrl);
-      return actionOk({
-        ...presign,
-        uploadUrl: mode === "browser" ? absoluteUploadUrl(presign.uploadUrl, env.apiUrl) : presign.uploadUrl,
-        mode,
-      });
+      const target = browserUploadTarget(presign, env.apiUrl);
+      return actionOk({ ...presign, uploadUrl: target.url, headers: target.headers });
     },
     "دریافت لینک آپلود ناموفق بود.",
   );
-}
-
-export async function uploadGalleryFileAction(formData: FormData): Promise<ActionResult<{ ok: true }>> {
-  const file = formData.get("file");
-  const keyValue = formData.get("key");
-  const contentTypeValue = formData.get("contentType");
-  if (!(file instanceof File)) {
-    return actionFail(400, "فایل تصویر ارسال نشده است.");
-  }
-  if (typeof keyValue !== "string") {
-    return actionFail(400, "کلید فایل نامعتبر است.");
-  }
-
-  const allowed = isAllowedGalleryFile(file);
-  if (!allowed.ok) return actionFail(400, allowed.message);
-
-  const encodedKey = encodeGalleryObjectKey(keyValue);
-  if (!encodedKey) return actionFail(400, "کلید فایل نامعتبر است.");
-
-  const contentType =
-    typeof contentTypeValue === "string" && contentTypeValue
-      ? contentTypeValue
-      : file.type || "application/octet-stream";
-  const bytes = await file.arrayBuffer();
-  const call = await callAdminBackend(`/gallery/upload/${encodedKey}`, {
-    method: "PUT",
-    body: bytes,
-    headers: { "Content-Type": contentType, Accept: "*/*" },
-  });
-  return adminCallToResult(call, () => actionOk({ ok: true }), "آپلود فایل ناموفق بود.");
 }
 
 export async function registerGalleryAction(

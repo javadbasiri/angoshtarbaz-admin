@@ -1,5 +1,5 @@
 import { backendFetch, extractUser, getSessionToken } from "@/lib/backend";
-import { AUTH_ME_PATH } from "@/lib/env";
+import { AUTH_PROFILE_PATH } from "@/lib/env";
 import { isNextRedirect } from "@/lib/redirect-error";
 import type { AdminUser } from "@/types/auth";
 
@@ -9,8 +9,8 @@ export type CurrentUserState =
   | { status: "ready"; user: AdminUser | null };
 
 /**
- * Current admin for the shell. `GET /auth/me` only.
- * A missing endpoint leaves the session in place and the header uses its default label.
+ * Current admin for the shell. `GET /auth/profile` only.
+ * A non-401 failure leaves the session in place and the header uses its fallback label.
  * 401 does not clear the cookie here — cookie writes belong in a Server Action.
  * The shell renders `ExpireSession`, which clears it and redirects to `/login`.
  */
@@ -19,7 +19,7 @@ export async function loadCurrentUser(): Promise<CurrentUserState> {
   if (!token) return { status: "anonymous" };
 
   try {
-    const { response, body } = await backendFetch(AUTH_ME_PATH, { method: "GET" }, token);
+    const { response, body } = await backendFetch(AUTH_PROFILE_PATH, { method: "GET" }, token);
     if (response.status === 401) return { status: "unauthorized" };
     if (!response.ok) return { status: "ready", user: null };
     return { status: "ready", user: extractUser(body) };

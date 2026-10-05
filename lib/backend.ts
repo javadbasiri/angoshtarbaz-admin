@@ -126,10 +126,14 @@ export function extractUser(body: unknown, emailFallback?: string): AdminUser | 
     (typeof candidate.role === "string" && candidate.role) ||
     (Array.isArray(candidate.roles) ? String(candidate.roles[0] ?? "admin") : "admin");
 
+  const firstName = typeof candidate.firstName === "string" ? candidate.firstName : undefined;
+  const lastName = typeof candidate.lastName === "string" ? candidate.lastName : undefined;
+
   return {
     id: candidate.id != null ? String(candidate.id) : undefined,
     email,
-    name: typeof candidate.name === "string" ? candidate.name : undefined,
+    firstName,
+    lastName,
     role,
   };
 }

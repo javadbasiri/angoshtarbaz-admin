@@ -1,6 +1,6 @@
 import { ApiError } from "@/lib/api";
 import { unwrapAction } from "@/lib/call-action";
-import { presignGalleryAction, registerGalleryAction, uploadGalleryFileAction } from "@/lib/gallery-actions";
+import { presignGalleryAction, registerGalleryAction } from "@/lib/gallery-actions";
 import { isAllowedGalleryFile } from "@/lib/gallery";
 import type { GalleryAsset } from "@/types/gallery";
 
@@ -39,10 +39,9 @@ function putWithProgress(
 }
 
 /**
- * Presign on the server, then upload.
- * External presigned URLs (S3 and other non-Nest hosts) are PUT by the browser.
- * Mock storage and Nest-origin upload URLs need the admin JWT, so those bytes
- * go through `uploadGalleryFileAction`.
+ * Presign on the server (admin JWT), then PUT the bytes from the browser to
+ * `uploadUrl`. Mock auth is the `?token=` on that URL; S3 auth is the signed
+ * URL. Neither PUT sends the admin JWT. Register stays on the server.
  */
 export async function uploadFileToGallery(
   file: File,
@@ -65,19 +64,9 @@ export async function uploadFileToGallery(
   );
 
   onProgress?.(18);
-  if (presign.mode === "browser") {
-    await putWithProgress(presign.uploadUrl, file, presign.headers, (percent) => {
-      onProgress?.(18 + Math.round(percent * 0.7));
-    });
-  } else {
-    onProgress?.(45);
-    const body = new FormData();
-    body.set("file", file);
-    body.set("key", presign.key);
-    body.set("contentType", contentType);
-    await unwrapAction(await uploadGalleryFileAction(body));
-    onProgress?.(88);
-  }
+  await putWithProgress(presign.uploadUrl, file, presign.headers, (percent) => {
+    onProgress?.(18 + Math.round(percent * 0.7));
+  });
 
   onProgress?.(92);
   const asset = await unwrapAction(

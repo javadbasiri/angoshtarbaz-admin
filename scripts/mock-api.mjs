@@ -15,8 +15,16 @@ import { randomUUID } from "node:crypto";
 const PORT = Number(process.env.MOCK_API_PORT || 3001);
 const SEED_EMAIL = "admin@angoshtarbaz.local";
 const SEED_PASSWORD = "admin123456";
+const ADMIN_PROFILE = {
+  id: "6f1c2a40-9b3e-4d1a-8c77-2a1b0e5d9f10",
+  email: SEED_EMAIL,
+  firstName: "سارا",
+  lastName: "احمدی",
+  role: "admin",
+};
 
 const tokens = new Map();
+const uploadGrants = new Map();
 const products = new Map();
 const uploads = new Map();
 const galleryAssets = new Map();
@@ -308,23 +316,34 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const accessToken = `mock.${randomUUID()}`;
-      tokens.set(accessToken, { email: SEED_EMAIL, role: "admin", name: "ادمین فروشگاه" });
+      tokens.set(accessToken, { ...ADMIN_PROFILE });
       send(
         res,
         200,
         {
           accessToken,
-          user: { email: SEED_EMAIL, role: "admin", name: "ادمین فروشگاه" },
+          user: { ...ADMIN_PROFILE },
         },
         origin,
       );
       return;
     }
 
-    if (req.method === "GET" && url.pathname === "/auth/me") {
+    if (req.method === "GET" && url.pathname === "/auth/profile") {
       const session = requireAdmin(req, res, origin);
       if (!session) return;
-      send(res, 200, { user: session }, origin);
+      send(
+        res,
+        200,
+        {
+          id: session.id,
+          email: session.email,
+          firstName: session.firstName,
+          lastName: session.lastName,
+          role: session.role,
+        },
+        origin,
+      );
       return;
     }
 
@@ -354,11 +373,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const key = `gallery/${randomUUID()}-${safeFilename(filename)}`;
+      const uploadToken = randomUUID();
+      uploadGrants.set(uploadToken, key);
       send(
         res,
         200,
         {
-          uploadUrl: `${publicOrigin(req)}/gallery/upload/${key}`,
+          uploadUrl: `${publicOrigin(req)}/gallery/upload/${key}?token=${encodeURIComponent(uploadToken)}`,
           headers: { "Content-Type": contentType },
           key,
           publicUrl: `${publicOrigin(req)}/gallery/files/${key}`,
@@ -371,8 +392,12 @@ const server = http.createServer(async (req, res) => {
 
     const uploadMatch = url.pathname.match(/^\/gallery\/upload\/(.+)$/);
     if (uploadMatch && req.method === "PUT") {
-      if (!requireAdmin(req, res, origin)) return;
       const key = decodeURIComponent(uploadMatch[1]);
+      const grant = url.searchParams.get("token");
+      if (!grant || uploadGrants.get(grant) !== key) {
+        send(res, 401, { message: "توکن آپلود نامعتبر است." }, origin);
+        return;
+      }
       const buffer = await readBody(req);
       const contentType = req.headers["content-type"] || "application/octet-stream";
       galleryFiles.set(key, { buffer, contentType, filename: key.split("/").pop() || key });
@@ -573,5 +598,6 @@ server.listen(PORT, () => {
   console.log(`seed: ${SEED_EMAIL} / ${SEED_PASSWORD}`);
   console.log(`sample product GET /products/${SEED_SOLITAIRE.id}`);
   console.log("list: GET /products?status=&search=&page=&limit= (JWT)");
-  console.log("gallery: POST /gallery/presign · PUT /gallery/upload/:key · POST/GET /gallery");
+  console.log("profile: GET /auth/profile (JWT)");
+  console.log("gallery: POST /gallery/presign · PUT /gallery/upload/:key?token= · POST/GET /gallery");
 });

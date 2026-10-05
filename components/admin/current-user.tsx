@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect } from "react";
+import { adminDisplayName } from "@/lib/admin-display";
 import { expireAdminSession } from "@/lib/expire-session";
 import { SESSION_EXPIRED_EVENT } from "@/lib/session-expired";
 import type { AdminUser } from "@/types/auth";
@@ -29,6 +30,5 @@ export function CurrentUserProvider({
 
 export function useAdminDisplayName() {
   const user = useContext(CurrentUserContext);
-  const name = user?.name?.trim();
-  return name || "ادمین فروشگاه";
+  return adminDisplayName(user);
 }

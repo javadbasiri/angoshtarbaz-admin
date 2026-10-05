@@ -1,87 +1,53 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  absoluteUploadUrl,
-  encodeGalleryObjectKey,
-  galleryUploadMode,
-} from "./gallery-upload-target.ts";
+import { absoluteUploadUrl, browserUploadTarget } from "./gallery-upload-target.ts";
 
 const API = "http://localhost:3001";
 
-describe("galleryUploadMode", () => {
-  it("sends mock and same-origin uploads through the server action", () => {
-    assert.equal(
-      galleryUploadMode(
-        { provider: "mock", uploadUrl: "http://localhost:3001/gallery/upload/gallery/a.jpg" },
-        API,
-      ),
-      "server",
+describe("browserUploadTarget", () => {
+  it("keeps the mock query token and drops Authorization", () => {
+    const target = browserUploadTarget(
+      {
+        uploadUrl: "http://localhost:3001/gallery/upload/gallery/a.jpg?token=abc",
+        headers: { "Content-Type": "image/png", Authorization: "Bearer secret", Host: "localhost" },
+      },
+      API,
     );
-    assert.equal(
-      galleryUploadMode(
-        { provider: "Mock", uploadUrl: "https://cdn.example/file.jpg" },
-        API,
-      ),
-      "server",
-    );
-    assert.equal(
-      galleryUploadMode(
-        { uploadUrl: "http://localhost:3001/gallery/upload/gallery/a.jpg" },
-        API,
-      ),
-      "server",
-    );
-    assert.equal(galleryUploadMode({ uploadUrl: "/gallery/upload/gallery/a.jpg" }, API), "server");
+    assert.equal(target.url, "http://localhost:3001/gallery/upload/gallery/a.jpg?token=abc");
+    assert.deepEqual(target.headers, { "Content-Type": "image/png" });
   });
 
-  it("lets the browser PUT external presigned URLs", () => {
-    assert.equal(
-      galleryUploadMode(
-        {
-          provider: "s3",
-          uploadUrl: "https://bucket.s3.amazonaws.com/gallery/a.jpg?X-Amz-Signature=abc",
-        },
-        API,
-      ),
-      "browser",
+  it("absolutizes a relative mock upload URL", () => {
+    const target = browserUploadTarget(
+      {
+        uploadUrl: "/gallery/upload/gallery/a.jpg?token=abc",
+        headers: { "Content-Type": "image/jpeg" },
+      },
+      API,
     );
-    assert.equal(
-      galleryUploadMode(
-        { provider: "public", uploadUrl: "http://localhost:3001/gallery/upload/gallery/a.jpg" },
-        API,
-      ),
-      "browser",
+    assert.equal(target.url, "http://localhost:3001/gallery/upload/gallery/a.jpg?token=abc");
+    assert.deepEqual(target.headers, { "Content-Type": "image/jpeg" });
+  });
+
+  it("leaves an s3 signed URL on its own host", () => {
+    const signed = "https://bucket.storage.liara.space/gallery/a.jpg?X-Amz-Signature=abc";
+    const target = browserUploadTarget(
+      { uploadUrl: signed, headers: { "Content-Type": "image/webp" } },
+      API,
     );
-    assert.equal(
-      galleryUploadMode(
-        { uploadUrl: "https://cdn.example/signed/a.jpg" },
-        API,
-      ),
-      "browser",
-    );
+    assert.equal(target.url, signed);
   });
 });
 
 describe("absoluteUploadUrl", () => {
   it("resolves relative upload URLs against the Nest origin", () => {
     assert.equal(
-      absoluteUploadUrl("/gallery/upload/gallery/a.jpg", API),
-      "http://localhost:3001/gallery/upload/gallery/a.jpg",
+      absoluteUploadUrl("/gallery/upload/gallery/a.jpg?token=abc", API),
+      "http://localhost:3001/gallery/upload/gallery/a.jpg?token=abc",
     );
     assert.equal(
       absoluteUploadUrl("https://bucket.s3.amazonaws.com/a.jpg", API),
       "https://bucket.s3.amazonaws.com/a.jpg",
     );
-  });
-});
-
-describe("encodeGalleryObjectKey", () => {
-  it("encodes safe keys and rejects traversal", () => {
-    assert.equal(encodeGalleryObjectKey("gallery/file.jpg"), "gallery/file.jpg");
-    assert.equal(encodeGalleryObjectKey("gallery/a b.jpg"), "gallery/a%20b.jpg");
-    assert.equal(encodeGalleryObjectKey("../etc/passwd"), null);
-    assert.equal(encodeGalleryObjectKey("/gallery/a.jpg"), null);
-    assert.equal(encodeGalleryObjectKey("gallery//a.jpg"), null);
-    assert.equal(encodeGalleryObjectKey(""), null);
   });
 });
