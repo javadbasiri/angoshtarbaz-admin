@@ -20,7 +20,15 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  if (token && pathname === "/login") {
+  // Document GET /login bounces to the app when a session already exists.
+  // A POST (including a Server Action, which sends `next-action`) must reach
+  // the action — a 307 would drop a submit from a stale login tab.
+  if (
+    token &&
+    pathname === "/login" &&
+    request.method !== "POST" &&
+    !request.headers.has("next-action")
+  ) {
     const next = request.nextUrl.searchParams.get("next");
     return NextResponse.redirect(new URL(next || "/", request.url));
   }

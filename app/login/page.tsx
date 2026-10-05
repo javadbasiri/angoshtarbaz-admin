@@ -20,7 +20,7 @@ export default function LoginPage() {
         <p className="login-card__seed">
           حساب نمونه: <strong>admin@angoshtarbaz.local</strong> / <strong>admin123456</strong>
           <br />
-          API پیش‌فرض: <code>http://localhost:3001</code>
+          API پیش‌فرض: <code>http://localhost:3000</code>
         </p>
       </section>
     </main>

@@ -25,13 +25,15 @@ cp .env.example .env.local
 npm run dev
 ```
 
-ادمین: [http://localhost:3000](http://localhost:3000)
+ادمین: [http://localhost:3001](http://localhost:3001)
 
-بک‌اند باید روی پورت پیش‌فرض `3001` باشد (`NEXT_PUBLIC_API_URL`). اگر [angoshtarbaz-backend](https://github.com/javadbasiri/angoshtarbaz-backend) (ایجاد/ویرایش محصول + گالری PR #4) در دسترس نیست، API ساختگی محلی را اجرا کنید:
+`NEXT_PUBLIC_API_URL` باید مبدأ Nest باشد: `http://localhost:3000`. ادمین روی پورت **۳۰۰۱** و API ساختگی روی **۳۰۰۲** اجرا می‌شود. مقدار خالی یا فقط فاصله نادیده گرفته می‌شود و به پیش‌فرض (`http://localhost:3000`) برمی‌گردد.
+
+اگر [angoshtarbaz-backend](https://github.com/javadbasiri/angoshtarbaz-backend) (ایجاد/ویرایش محصول + گالری PR #4) در دسترس نیست، API ساختگی محلی را اجرا کنید و `NEXT_PUBLIC_API_URL` را روی همان مبدأ بگذارید:
 
 ```bash
 npm run mock-api
-# http://localhost:3001  — login / collections / products / gallery
+# http://localhost:3002  — login / collections / products / gallery
 # نمونه: GET /products/prd_solitaire_01
 ```
 
@@ -39,10 +41,10 @@ npm run mock-api
 
 ### CORS
 
-بک‌اند `ADMIN_ORIGIN` را پیش‌فرض `http://localhost:3001` می‌گذارد. این پنل روی **۳۰۰۰** اجرا می‌شود؛ برای توسعه محلی یکی از این‌ها را روی بک‌اند ست کنید:
+این پنل روی **۳۰۰۱** اجرا می‌شود. برای توسعه محلی روی بک‌اند ست کنید:
 
 ```bash
-ADMIN_ORIGIN=http://localhost:3000
+ADMIN_ORIGIN=http://localhost:3001
 ```
 
 یا در محیط محلی بدون env، بک‌اند Origin را reflect می‌کند.
@@ -155,12 +157,12 @@ ADMIN_ORIGIN=http://localhost:3000
 | Command | |
 | --- | --- |
 | `npm i` | نصب وابستگی‌ها |
-| `npm run dev` | Next.js روی :3000 |
-| `npm run mock-api` | API ساختگی روی :3001 |
+| `npm run dev` | Next.js روی :3001 |
+| `npm run mock-api` | API ساختگی روی :3002 |
 | `npm run build` | بیلد پروداکشن |
 | `npm run start` | سرو بیلد |
 | `npm run lint` | ESLint |
 
 ## Env
 
-`NEXT_PUBLIC_API_URL` (پیش‌فرض `http://localhost:3001`) را در `.env.local` بگذارید. جزئیات در `.env.example`.
+`NEXT_PUBLIC_API_URL` باید مبدأ Nest باشد (`http://localhost:3000`). ادمین روی ۳۰۰۱ و API ساختگی روی ۳۰۰۲ است. مقدار خالی به پیش‌فرض برمی‌گردد. جزئیات در `.env.example`.

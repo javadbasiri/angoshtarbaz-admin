@@ -4,10 +4,10 @@
   "private": true,
   "description": "انگشترباز admin panel (Next.js App Router)",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3001",
     "mock-api": "node scripts/mock-api.mjs",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3001",
     "lint": "eslint"
   },
   "dependencies": {
