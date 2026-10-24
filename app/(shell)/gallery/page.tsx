@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import { AdminShell } from "@/components/admin/shell";
+import { GalleryFoldersLibrary, GalleryFoldersSkeleton } from "@/components/gallery/gallery-folders";
 import { GalleryLibrary } from "@/components/gallery/gallery-library";
+import { env } from "@/lib/env";
 
 export default function GalleryPage() {
   return (
@@ -10,7 +13,13 @@ export default function GalleryPage() {
         { label: "گالری رسانه" },
       ]}
     >
-      <GalleryLibrary />
+      {env.galleryFolders ? (
+        <Suspense fallback={<GalleryFoldersSkeleton />}>
+          <GalleryFoldersLibrary />
+        </Suspense>
+      ) : (
+        <GalleryLibrary />
+      )}
     </AdminShell>
   );
 }

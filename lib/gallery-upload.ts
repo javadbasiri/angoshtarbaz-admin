@@ -4,7 +4,8 @@ import { presignGalleryAction, registerGalleryAction } from "@/lib/gallery-actio
 import { isAllowedGalleryFile } from "@/lib/gallery";
 import type { GalleryAsset } from "@/types/gallery";
 
-function putWithProgress(
+/** Browser PUT to a presigned `uploadUrl`. Does not send the admin JWT. */
+export function putGalleryBytes(
   url: string,
   file: File,
   headers: Record<string, string>,
@@ -63,7 +64,7 @@ export async function uploadFileToGallery(
   );
 
   onProgress?.(18);
-  await putWithProgress(presign.uploadUrl, file, presign.headers, (percent) => {
+  await putGalleryBytes(presign.uploadUrl, file, presign.headers, (percent) => {
     onProgress?.(18 + Math.round(percent * 0.7));
   });
 
